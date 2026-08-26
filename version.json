@@ -1,13 +1,14 @@
 {
-  "version": "4.3.6",
+  "version": "4.4.1",
   "releaseDate": "2026-08-26",
-  "minRequiredVersion": "4.0.0",
-  "downloadUrl": "https://raw.githubusercontent.com/disky1998/replenish-system/main/补货辅助系统4.3.6.html",
-  "jsdelivrDownloadUrl": "https://fastly.jsdelivr.net/gh/disky1998/replenish-system@main/补货辅助系统4.3.6.html",
-  "githubUrl": "https://github.com/disky1998/replenish-system",
+  "title": "v4.4.1 全面升级版",
   "changelog": [
-    "1. 【版本测试】本版本为在线更新功能连通性验证版本；",
-    "2. 【体验一致】全量功能、120 FPS 极速轻量架构与方案 H 极简 Logo 保持完全一致；",
-    "3. 【算法稳定】底层加权月销、爆旺平判定、缺货断货补差与多仓成本路由等算法 100% 保持稳定。"
-  ]
+    "【全表 16:9 一屏全览】全表 19 列内边距与列宽极致紧凑重构，适配标准 16:9 屏幕一屏全显无需横向滚动",
+    "【售价排序与表头优化】表头文字常驻，支持点击按售价升降序自由切换，无售价数据优雅沉底",
+    "【亏本筛选双向联动】新增顶部「⚠️ 仅看亏本」快捷勾选框与表头微型切换器，双向秒级过滤",
+    "【下载筛选全部数据】批量操作区新增「下载筛选全部数据」按钮，支持导出当前筛选下的全量商品明细",
+    "【多仓成本双向借用】新增 FBA ⇋ SF 智能双向互相借用兜底机制，多仓成本匹配更智能更精准"
+  ],
+  "forceUpdate": false,
+  "downloadFileName": "补货辅助系统4.4.1.html"
 }
