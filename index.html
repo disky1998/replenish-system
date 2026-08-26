@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.2.1</title>
+    <title>智能补货辅助系统 v4.3.5</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 -->
@@ -140,59 +140,6 @@
             </div>
         </div>
 
-        
-        <!-- 全局版本更新提示弹窗 (v4.2.1) -->
-        <transition name="fade">
-            <div v-show="showUpdateModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[999999] flex items-center justify-center p-4">
-                <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-[480px] max-w-full overflow-hidden flex flex-col transform transition-all">
-                    <!-- 弹窗头部 -->
-                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white text-left relative">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs bg-white/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">🚀 发现新版本</span>
-                            <span class="text-xs text-blue-100 font-mono">{{ updateInfo.releaseDate }}</span>
-                        </div>
-                        <h2 class="text-2xl font-black flex items-center gap-2">
-                            补货辅助系统 v{{ updateInfo.latestVersion }}
-                        </h2>
-                        <p class="text-blue-100 text-xs mt-1">当前使用版本：v{{ CURRENT_VERSION }}，建议升级以获得最佳性能与算法体验</p>
-                        <button @click="showUpdateModal = false" class="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-
-                    <!-- 更新日志区域 -->
-                    <div class="p-6 space-y-4 text-left max-h-[50vh] overflow-y-auto">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">📋 更新内容详情</h3>
-                        <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                            <div v-for="(log, idx) in updateInfo.changelog" :key="idx" class="text-xs text-slate-700 leading-relaxed flex items-start gap-2">
-                                <span class="text-blue-500 font-bold mt-0.5">•</span>
-                                <span>{{ log }}</span>
-                            </div>
-                            <div v-if="!updateInfo.changelog || updateInfo.changelog.length === 0" class="text-xs text-slate-400">
-                                包含了常规体验升级与算法优化。
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 底部操作按钮 -->
-                    <div class="bg-slate-50 p-4 px-6 border-t border-slate-100 flex items-center justify-between gap-3">
-                        <button @click="showUpdateModal = false" class="px-4 py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
-                            稍后提醒
-                        </button>
-                        <div class="flex items-center gap-2">
-                            <a :href="updateInfo.githubUrl" target="_blank" class="px-4 py-2.5 text-xs text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 font-medium transition-colors">
-                                查看 GitHub
-                            </a>
-                            <button @click="downloadLatestHtml" :disabled="isDownloadingUpdate" class="px-6 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2">
-                                <svg v-if="isDownloadingUpdate" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-                                <span>{{ isDownloadingUpdate ? '正在下载...' : '一键下载最新版' }}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </transition>
-
         <!-- 全局单例高清趋势浮动视窗 (极速渲染·零卡顿 120 FPS 架构) -->
         <div class="fixed z-[99999] transition-all duration-150 ease-out transform origin-center"
              :class="trendTooltipVisible ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'"
@@ -307,6 +254,65 @@
             </div>
         </div>
 
+        
+        <!-- 全屏版本更新提示弹窗 (v4.3.3 沉浸交互) -->
+        <transition name="fade">
+            <div v-if="showUpdateModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[999999] flex items-center justify-center p-4">
+                <div class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-[520px] max-w-full overflow-hidden flex flex-col transform transition-all animate-in fade-in zoom-in-95 duration-200">
+                    
+                    <!-- 弹窗顶部渐变头部 -->
+                    <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-6 text-white text-left relative">
+                        <!-- 右上角 X 关闭按钮 -->
+                        <button @click="showUpdateModal = false" class="absolute top-4 right-4 text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer" title="关闭">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-[11px] bg-white/20 backdrop-blur px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">🚀 发现新版本发布</span>
+                            <span v-if="updateInfo.releaseDate" class="text-xs text-blue-100 font-mono">{{ updateInfo.releaseDate }}</span>
+                        </div>
+                        <h2 class="text-2xl font-black flex items-center gap-2">
+                            补货辅助系统 v{{ updateInfo.latestVersion }}
+                        </h2>
+                        <p class="text-blue-100 text-xs mt-1">当前使用版本：v{{ CURRENT_VERSION }}，建议升级体验最新算法与性能优化</p>
+                    </div>
+
+                    <!-- 更新日志区域 -->
+                    <div class="p-6 space-y-3 text-left max-h-[55vh] overflow-y-auto">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">📋 本次更新详情</h3>
+                            <span class="text-[10px] text-slate-400">来自官方 GitHub 仓库</span>
+                        </div>
+                        <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <div v-for="(log, idx) in updateInfo.changelog" :key="idx" class="text-xs text-slate-700 leading-relaxed flex items-start gap-2">
+                                <span class="text-blue-600 font-bold mt-0.5 shrink-0">•</span>
+                                <span>{{ log }}</span>
+                            </div>
+                            <div v-if="!updateInfo.changelog || updateInfo.changelog.length === 0" class="text-xs text-slate-400">
+                                包含了常规体验升级、性能优化与算法精进。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部操作按钮区域 -->
+                    <div class="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <button @click="showUpdateModal = false" class="px-4 py-2.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors cursor-pointer">
+                            稍后提醒 (暂不更新)
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <a v-if="updateInfo.githubUrl" :href="updateInfo.githubUrl" target="_blank" class="px-4 py-2.5 text-xs text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 font-medium transition-colors cursor-pointer">
+                                查看 GitHub
+                            </a>
+                            <button @click="downloadLatestHtml" :disabled="isDownloadingUpdate" class="px-6 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer">
+                                <svg v-if="isDownloadingUpdate" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                <span>{{ isDownloadingUpdate ? '正在下载中...' : '⬇️ 立即下载新版本' }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
         <!-- 头部导航栏 -->
         <header class="glass-panel rounded-2xl p-4 md:p-6 mb-4 flex flex-col z-10 relative flex-shrink-0">
             <div class="flex items-center justify-between w-full flex-wrap gap-4">
@@ -315,7 +321,11 @@
      @click="isConfigCollapsed = !isConfigCollapsed" 
      title="点击折叠/展开基础数据面板">
     <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-3 whitespace-nowrap">
-        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+        <div class="w-8 h-8 flex items-center justify-center shrink-0 text-blue-600">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+        </div>
         智能补货辅助系统
         <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-bold tracking-tight">v{{ CURRENT_VERSION }}</span>
         <span v-if="updateInfo.hasUpdate" @click.stop="showUpdateModal = true" class="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse shadow-sm flex items-center gap-1 cursor-pointer hover:bg-rose-600">
@@ -1010,13 +1020,14 @@
                         </label>
                     </div>
 
-                    
-                    <!-- 在线版本检测设置卡片 (v4.2.1) -->
-                    <div class="p-4 bg-blue-50/60 rounded-xl border border-blue-100 space-y-3">
+                    <div class="text-xs text-slate-400 text-center pb-2">修改参数后，表格将立即自动重新计算并缓存。</div>
+
+                    <!-- 在线版本检测卡片 (v4.3.2 极简版) -->
+                    <div class="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100 space-y-2">
                         <div class="flex items-center justify-between">
                             <h3 class="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                                <span>🔄 系统版本与在线更新</span>
-                                <span class="text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.2 rounded font-mono">v{{ CURRENT_VERSION }}</span>
+                                <span>🔄 系统版本</span>
+                                <span class="text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.2 rounded font-mono font-bold">v{{ CURRENT_VERSION }}</span>
                             </h3>
                             <button @click="checkVersionUpdate(true)" :disabled="isCheckingUpdate" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1">
                                 <svg v-if="isCheckingUpdate" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
@@ -1026,13 +1037,8 @@
                         <div v-if="checkUpdateMsg" class="text-[11px] font-medium text-blue-700 bg-white/80 p-2 rounded border border-blue-200">
                             {{ checkUpdateMsg }}
                         </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-500 mb-1">GitHub 仓库地址 (Owner/Repo)：</label>
-                            <input type="text" v-model="settings.githubRepo" class="w-full text-xs font-mono px-2 py-1.5 rounded border border-slate-200 bg-white focus:border-blue-400 outline-none" placeholder="例如: disky1998/replenish-system">
-                        </div>
                     </div>
 
-                    <div class="text-xs text-slate-400 text-center pb-2">修改参数后，表格将立即自动重新计算并缓存。</div>
                 </div>
             </div>
         </transition>
@@ -1067,7 +1073,7 @@
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.2.1';
+        const CURRENT_VERSION = '4.3.5';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1095,10 +1101,7 @@
             return data.map((d, i) => {
                 const x = i * step;
                 const y = height - (d.val / max) * (height - 4) - 2; 
-                return {
-                    CURRENT_VERSION,
-                    updateInfo, showUpdateModal, isCheckingUpdate, checkUpdateMsg, isDownloadingUpdate,
-                    checkVersionUpdate, downloadLatestHtml, x, y, step, val: d.val, label: `${d.date}: ${d.val}个` };
+                return { x, y, step, val: d.val, label: `${d.date}: ${d.val}个` };
             });
         };
         const getSparklinePathRaw = (pts) => {
@@ -1170,6 +1173,144 @@
 
         const app = createApp({
             setup() {
+                
+                // 版本检测与在线更新状态 (v4.3.1)
+                const updateInfo = ref({
+                    hasUpdate: false,
+                    latestVersion: '',
+                    releaseDate: '',
+                    changelog: [],
+                    downloadUrl: '',
+                    githubUrl: ''
+                });
+                const showUpdateModal = ref(false);
+                const isCheckingUpdate = ref(false);
+                const checkUpdateMsg = ref('');
+                const isDownloadingUpdate = ref(false);
+
+                                const checkVersionUpdate = async (isManual = false) => {
+                    if (isCheckingUpdate.value) return;
+                    isCheckingUpdate.value = true;
+                    checkUpdateMsg.value = '正在检测最新版本...';
+
+                    const repo = (settings.value && settings.value.githubRepo ? settings.value.githubRepo.trim() : '') || DEFAULT_GITHUB_REPO;
+                    const sources = [
+                        { url: `https://api.github.com/repos/${repo}/contents/version.json?_t=${Date.now()}`, headers: { 'Accept': 'application/vnd.github.v3.raw' } },
+                        { url: `https://raw.githubusercontent.com/${repo}/main/version.json?_t=${Date.now()}`, headers: {} },
+                        { url: `https://fastly.jsdelivr.net/gh/${repo}@main/version.json?_t=${Date.now()}`, headers: {} }
+                    ];
+
+                    let fetchedData = null;
+                    for (const item of sources) {
+                        try {
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 3500);
+                            const res = await fetch(item.url, { headers: item.headers, signal: controller.signal });
+                            clearTimeout(timeoutId);
+                            if (res.ok) {
+                                fetchedData = await res.json();
+                                if (fetchedData && fetchedData.version) break;
+                            }
+                        } catch (e) {}
+                    }
+
+                    isCheckingUpdate.value = false;
+
+                    if (!fetchedData || !fetchedData.version) {
+                        if (isManual) {
+                            checkUpdateMsg.value = '❌ 检测失败，请检查网络连接';
+                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
+                        }
+                        return;
+                    }
+
+                    const isNew = compareVersions(fetchedData.version, CURRENT_VERSION) > 0;
+                    updateInfo.value = {
+                        hasUpdate: isNew,
+                        latestVersion: fetchedData.version,
+                        releaseDate: fetchedData.releaseDate || '',
+                        changelog: fetchedData.changelog || [],
+                        downloadUrl: fetchedData.jsdelivrDownloadUrl || fetchedData.downloadUrl || '',
+                        githubUrl: fetchedData.githubUrl || `https://github.com/${repo}`
+                    };
+
+                    if (isNew) {
+                        // 有新版本：全屏弹出提示新版本详情与下载按钮
+                        showUpdateModal.value = true;
+                        checkUpdateMsg.value = `🔥 发现新版本 v${fetchedData.version}`;
+                    } else {
+                        // 是最新版本：页面刷新自动检测时完全静默，不提示任何信息；仅在手动点击时提示
+                        showUpdateModal.value = false;
+                        if (isManual) {
+                            checkUpdateMsg.value = `🎉 当前已是最新版本 (v${CURRENT_VERSION})`;
+                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
+                        }
+                    }
+                };
+
+                const downloadLatestHtml = async () => {
+                    if (isDownloadingUpdate.value) return;
+                    isDownloadingUpdate.value = true;
+
+                    const fileName = `补货辅助系统${updateInfo.value.latestVersion}.html`;
+                    const encFileName = encodeURIComponent(fileName);
+                    const repo = (settings.value && settings.value.githubRepo ? settings.value.githubRepo.trim() : '') || DEFAULT_GITHUB_REPO;
+
+                    // 多源极速容灾下载列表
+                    const downloadSources = [
+                        `https://fastly.jsdelivr.net/gh/${repo}@main/${encFileName}?_t=${Date.now()}`,
+                        `https://cdn.jsdelivr.net/gh/${repo}@main/${encFileName}?_t=${Date.now()}`,
+                        `https://raw.githubusercontent.com/${repo}/main/${encFileName}?_t=${Date.now()}`,
+                        `https://fastly.jsdelivr.net/gh/${repo}@main/index.html?_t=${Date.now()}`
+                    ];
+
+                    let downloadedText = null;
+
+                    for (const url of downloadSources) {
+                        try {
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 6000);
+                            const res = await fetch(url, { signal: controller.signal });
+                            clearTimeout(timeoutId);
+                            if (res.ok) {
+                                const text = await res.text();
+                                if (text && text.length > 50000 && text.includes('id="app"')) {
+                                    downloadedText = text;
+                                    break;
+                                }
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (downloadedText) {
+                        try {
+                            const blob = new Blob([downloadedText], { type: 'text/html;charset=utf-8' });
+                            const blobUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = blobUrl;
+                            a.download = `补货辅助系统v${updateInfo.value.latestVersion}.html`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                            isDownloadingUpdate.value = false;
+                            alert(`✅ 新版本【补货辅助系统v${updateInfo.value.latestVersion}.html】已成功下载至您的电脑！\n\n请在下载文件夹中双击即可直接使用！`);
+                            return;
+                        } catch (e) {}
+                    }
+
+                    // 备用兜底：如果 Blob 创建受限，直接触发浏览器原生下载标签
+                    isDownloadingUpdate.value = false;
+                    const directUrl = `https://fastly.jsdelivr.net/gh/${repo}@main/${encFileName}`;
+                    const a = document.createElement('a');
+                    a.href = directUrl;
+                    a.target = '_blank';
+                    a.download = `补货辅助系统v${updateInfo.value.latestVersion}.html`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+
                 const showSettings = ref(false);
                 const showSOP = ref(false);
                 const isDragOver = ref(false); 
@@ -1357,108 +1498,6 @@
                     }
                 };
 
-                
-                // 版本检测与在线更新状态 (v4.2.1)
-                const updateInfo = ref({
-                    hasUpdate: false,
-                    latestVersion: '',
-                    releaseDate: '',
-                    changelog: [],
-                    downloadUrl: '',
-                    githubUrl: ''
-                });
-                const showUpdateModal = ref(false);
-                const isCheckingUpdate = ref(false);
-                const checkUpdateMsg = ref('');
-                const isDownloadingUpdate = ref(false);
-
-                const checkVersionUpdate = async (isManual = false) => {
-                    if (isCheckingUpdate.value) return;
-                    isCheckingUpdate.value = true;
-                    checkUpdateMsg.value = '正在检测最新版本...';
-
-                    const repo = (settings.value && settings.value.githubRepo ? settings.value.githubRepo.trim() : '') || DEFAULT_GITHUB_REPO;
-                    // 双通道容灾：1. jsDelivr 国内加速 CDN 2. GitHub Raw 原源
-                    const sources = [
-                        `https://fastly.jsdelivr.net/gh/${repo}@main/version.json?_t=${Date.now()}`,
-                        `https://raw.githubusercontent.com/${repo}/main/version.json?_t=${Date.now()}`
-                    ];
-
-                    let fetchedData = null;
-                    for (const url of sources) {
-                        try {
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 4000);
-                            const res = await fetch(url, { signal: controller.signal });
-                            clearTimeout(timeoutId);
-                            if (res.ok) {
-                                fetchedData = await res.json();
-                                if (fetchedData && fetchedData.version) break;
-                            }
-                        } catch (e) {}
-                    }
-
-                    isCheckingUpdate.value = false;
-
-                    if (!fetchedData || !fetchedData.version) {
-                        if (isManual) {
-                            checkUpdateMsg.value = '❌ 检测失败，请检查网络或 GitHub 仓库配置';
-                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
-                        }
-                        return;
-                    }
-
-                    const isNew = compareVersions(fetchedData.version, CURRENT_VERSION) > 0;
-                    updateInfo.value = {
-                        hasUpdate: isNew,
-                        latestVersion: fetchedData.version,
-                        releaseDate: fetchedData.releaseDate || '',
-                        changelog: fetchedData.changelog || [],
-                        downloadUrl: fetchedData.jsdelivrDownloadUrl || fetchedData.downloadUrl || '',
-                        githubUrl: fetchedData.githubUrl || `https://github.com/${repo}`
-                    };
-
-                    if (isNew) {
-                        showUpdateModal.value = true;
-                        checkUpdateMsg.value = `🔥 发现新版本 v${fetchedData.version}`;
-                    } else {
-                        if (isManual) {
-                            checkUpdateMsg.value = `🎉 当前已是最新版本 (v${CURRENT_VERSION})`;
-                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
-                        }
-                    }
-                };
-
-                const downloadLatestHtml = async () => {
-                    if (!updateInfo.value.downloadUrl) {
-                        window.open(updateInfo.value.githubUrl || 'https://github.com', '_blank');
-                        return;
-                    }
-                    try {
-                        isDownloadingUpdate.value = true;
-                        const targetUrl = updateInfo.value.downloadUrl + (updateInfo.value.downloadUrl.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
-                        const res = await fetch(targetUrl);
-                        if (!res.ok) throw new Error('下载请求失败: ' + res.status);
-                        const text = await res.text();
-                        const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
-                        const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = blobUrl;
-                        a.download = `补货辅助系统v${updateInfo.value.latestVersion}.html`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(blobUrl);
-                        isDownloadingUpdate.value = false;
-                        alert(`✅ 新版本【补货辅助系统v${updateInfo.value.latestVersion}.html】已成功下载至您的电脑！`);
-                    } catch (err) {
-                        isDownloadingUpdate.value = false;
-                        console.error(err);
-                        alert('自动下载遇到网络限制，已为您打开 GitHub 页面进行下载！');
-                        window.open(updateInfo.value.githubUrl || updateInfo.value.downloadUrl, '_blank');
-                    }
-                };
-
                 const settings = ref({
                     githubRepo: DEFAULT_GITHUB_REPO,
                     showKsaCrossBorder: false, 
@@ -1582,7 +1621,6 @@
                         const savedSettings = await localforage.getItem('replenish_settings');
                         if (savedSettings) settings.value = { ...settings.value, ...savedSettings };
                         
-                        // 启动时静默检查更新 (1.2 秒延时无阻塞)
                         setTimeout(() => {
                             checkVersionUpdate(false);
                         }, 1200);
@@ -2849,6 +2887,14 @@ const exportExcel = () => {
 
 
                 return {
+                    CURRENT_VERSION,
+                    updateInfo,
+                    showUpdateModal,
+                    isCheckingUpdate,
+                    checkUpdateMsg,
+                    isDownloadingUpdate,
+                    checkVersionUpdate,
+                    downloadLatestHtml,
                     settings, showSettings, showSOP, hideSafe, needRestockCount,
                     isDragOver, hasSkuData,
                     isConfigCollapsed,
