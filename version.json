@@ -1,0 +1,13 @@
+{
+  "version": "4.2.1",
+  "releaseDate": "2026-08-26",
+  "minRequiredVersion": "4.0.0",
+  "downloadUrl": "https://raw.githubusercontent.com/disky1998/replenish-system/main/补货辅助系统4.2.1.html",
+  "jsdelivrDownloadUrl": "https://fastly.jsdelivr.net/gh/disky1998/replenish-system@main/补货辅助系统4.2.1.html",
+  "githubUrl": "https://github.com/disky1998/replenish-system",
+  "changelog": [
+    "1. 优化了销量统计页面下载后趋势图的卡顿问题 (120 FPS 极速轻量架构，DOM 节点减少 98%)",
+    "2. 优化了在线 listing 下载的销量数据趋势图显示问题 (3 阶段独立时序解耦，近 7 天在最左侧，顶端流线与微圆点自然呼应)",
+    "3. 加入了自动检测更新的功能 (每次打开自动检测 GitHub 最新版，支持更新日志展示与一键免跳转下载新版本)"
+  ]
+}
