@@ -1,0 +1,2928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能补货辅助系统 v4.2.1</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Vue 3 核心库 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 SheetJS -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- 引入 PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden; 
+        }
+        body {
+            background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .editable-input {
+            width: 100%; background: rgba(255,255,255,0.5); border: 1px solid #e2e8f0;
+            border-radius: 4px; padding: 4px 8px; transition: all 0.2s; text-align: center;
+        }
+        .editable-input:focus {
+            outline: none; border-color: #3b82f6; background: #fff;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .danger-select { border-color: #ef4444 !important; background-color: #fef2f2 !important; color: #b91c1c; }
+        select.text-center-last { text-align-last: center; }
+        .hover-point:hover .dot-target { opacity: 1 !important; }
+        
+        /* 固定表头核心 CSS */
+        .table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: auto;
+            min-height: 0; 
+        }
+        th.sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            background-color: #f8fafc; 
+            box-shadow: inset 0 -1px 0 #cbd5e1; 
+        }
+        th.sticky-header select { background-color: transparent; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased p-2 md:p-6 flex flex-col h-screen">
+    <div id="app" class="w-[98%] min-w-[1200px] mx-auto h-full flex flex-col relative">
+        <!-- 悬浮图片预览 -->
+        <div class="fixed z-[99999] pointer-events-none bg-white p-2 rounded-xl shadow-2xl border border-slate-200 flex items-center justify-center transition-all duration-200 ease-out transform origin-center"
+             :class="previewVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'"
+             :style="{ left: previewPos.left, top: previewPos.top, width: '280px', height: '280px' }">
+            <img v-if="previewImage" :src="previewImage" class="w-full h-full object-contain">
+        </div>
+
+        <!-- 悬浮改空运成本测算卡片 (亮色舒适风格，最高层级固定浮动，智能避让表头，不伤眼更清晰) -->
+        <div class="fixed z-[99999] pointer-events-none transition-all duration-150 ease-out transform origin-center"
+             :class="airTooltipVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'"
+             :style="{ left: airTooltipPos.left, top: airTooltipPos.top, width: '310px' }">
+            <div v-if="airTooltipItem" class="bg-white text-slate-800 text-xs rounded-2xl p-4 shadow-2xl border border-slate-200 text-left">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
+                    <span class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <span class="text-base">✈️</span> 紧急转空运成本测算
+                    </span>
+                    <span class="text-[11px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-200 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        断货风险
+                    </span>
+                </div>
+                
+                <div class="space-y-2.5 text-xs text-slate-600">
+                    <div class="bg-rose-50/90 text-rose-800 p-2.5 rounded-xl border border-rose-200 leading-relaxed text-[11px]">
+                        ⚠️ 当前可售仅剩 <strong class="text-rose-950 font-bold">{{ airTooltipItem.availableDays.toFixed(1) }}</strong> 天。<br>
+                        若走海运（约 {{ airTooltipItem.seaLeadTime }} 天到货），预计将经历 <strong class="text-rose-950 font-bold">{{ Math.max(0, Math.ceil(airTooltipItem.seaLeadTime - airTooltipItem.availableDays)) }}</strong> 天断货期！
+                    </div>
+
+                    <!-- 缺少数据时的特别警示提醒 -->
+                    <div v-if="airTooltipItem.urgentAirCostDiff.isMissingData" class="bg-amber-50 text-amber-900 p-2.5 rounded-xl border border-amber-200 leading-relaxed text-[11px]">
+                        🚨 <strong>数据缺失提醒</strong>：该 SKU 的{{ !airTooltipItem.urgentAirCostDiff.hasW ? '【实重】' : '' }}{{ !airTooltipItem.urgentAirCostDiff.hasV ? '【体积重】' : '' }}为 0，代表<strong>底层尚未录入真实数据</strong>（非真实0重）。当前测算仅供参考，请在马帮补全！
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px]">
+                        <div>实重: <strong :class="airTooltipItem.urgentAirCostDiff.hasW ? 'text-slate-900 font-bold' : 'text-red-500 font-bold'">{{ airTooltipItem.urgentAirCostDiff.hasW ? (airTooltipItem.weight || 0).toFixed(3) + ' kg' : '未录入 (0)' }}</strong> <span class="text-blue-600 font-medium">(空运)</span></div>
+                        <div>体积重: <strong :class="airTooltipItem.urgentAirCostDiff.hasV ? 'text-slate-900 font-bold' : 'text-red-500 font-bold'">{{ airTooltipItem.urgentAirCostDiff.hasV ? (airTooltipItem.volumeWeight || 0).toFixed(3) + ' kg' : '未录入 (0)' }}</strong> <span class="text-indigo-600 font-medium">(海运)</span></div>
+                        <div>空运单价: <span class="text-blue-700 font-bold">¥{{ airTooltipItem.airRate }}/kg</span></div>
+                        <div>海运单价: <span class="text-slate-700 font-bold">¥{{ airTooltipItem.seaRate }}/kg</span></div>
+                    </div>
+
+                    <div class="space-y-1.5 pt-1 text-xs">
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span>单件海运费:</span>
+                            <span :class="{'text-red-500 font-bold': !airTooltipItem.urgentAirCostDiff.hasV, 'text-slate-800 font-semibold': airTooltipItem.urgentAirCostDiff.hasV}">
+                                {{ airTooltipItem.urgentAirCostDiff.hasV ? '¥' + airTooltipItem.urgentAirCostDiff.seaPerUnit.toFixed(2) : '缺体积重' }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span>单件空运费:</span>
+                            <span :class="{'text-red-500 font-bold': !airTooltipItem.urgentAirCostDiff.hasW, 'text-slate-800 font-semibold': airTooltipItem.urgentAirCostDiff.hasW}">
+                                {{ airTooltipItem.urgentAirCostDiff.hasW ? '¥' + airTooltipItem.urgentAirCostDiff.airPerUnit.toFixed(2) : '缺实重' }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center text-amber-700 font-bold">
+                            <span>单件运费增加:</span>
+                            <span>{{ airTooltipItem.urgentAirCostDiff.isMissingData ? '数据不全待校对' : '+¥' + airTooltipItem.urgentAirCostDiff.diffPerUnit.toFixed(2) }}</span>
+                        </div>
+                        
+                        <!-- 汇总运费高亮框 -->
+                        <div class="flex justify-between items-center bg-emerald-50 text-emerald-950 border border-emerald-200 p-2.5 rounded-xl font-bold mt-1 shadow-sm">
+                            <span class="text-xs">建议补货 ({{ airTooltipItem.suggestedRestock }}件) 总增加:</span>
+                            <span class="text-sm font-black text-emerald-600">{{ airTooltipItem.urgentAirCostDiff.isMissingData ? '待补齐数据' : '+¥' + airTooltipItem.urgentAirCostDiff.totalDiff.toFixed(2) + ' 元' }}</span>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-blue-600 font-semibold text-center pt-2 border-t border-slate-100 flex items-center justify-center gap-1">
+                        👉 点击按钮可直接一键将物流设为「空运」
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
+        <!-- 全局版本更新提示弹窗 (v4.2.1) -->
+        <transition name="fade">
+            <div v-show="showUpdateModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[999999] flex items-center justify-center p-4">
+                <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-[480px] max-w-full overflow-hidden flex flex-col transform transition-all">
+                    <!-- 弹窗头部 -->
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white text-left relative">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs bg-white/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">🚀 发现新版本</span>
+                            <span class="text-xs text-blue-100 font-mono">{{ updateInfo.releaseDate }}</span>
+                        </div>
+                        <h2 class="text-2xl font-black flex items-center gap-2">
+                            补货辅助系统 v{{ updateInfo.latestVersion }}
+                        </h2>
+                        <p class="text-blue-100 text-xs mt-1">当前使用版本：v{{ CURRENT_VERSION }}，建议升级以获得最佳性能与算法体验</p>
+                        <button @click="showUpdateModal = false" class="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- 更新日志区域 -->
+                    <div class="p-6 space-y-4 text-left max-h-[50vh] overflow-y-auto">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">📋 更新内容详情</h3>
+                        <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <div v-for="(log, idx) in updateInfo.changelog" :key="idx" class="text-xs text-slate-700 leading-relaxed flex items-start gap-2">
+                                <span class="text-blue-500 font-bold mt-0.5">•</span>
+                                <span>{{ log }}</span>
+                            </div>
+                            <div v-if="!updateInfo.changelog || updateInfo.changelog.length === 0" class="text-xs text-slate-400">
+                                包含了常规体验升级与算法优化。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部操作按钮 -->
+                    <div class="bg-slate-50 p-4 px-6 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <button @click="showUpdateModal = false" class="px-4 py-2.5 text-xs text-slate-500 hover:text-slate-700 font-medium transition-colors">
+                            稍后提醒
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <a :href="updateInfo.githubUrl" target="_blank" class="px-4 py-2.5 text-xs text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 font-medium transition-colors">
+                                查看 GitHub
+                            </a>
+                            <button @click="downloadLatestHtml" :disabled="isDownloadingUpdate" class="px-6 py-2.5 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2">
+                                <svg v-if="isDownloadingUpdate" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                <span>{{ isDownloadingUpdate ? '正在下载...' : '一键下载最新版' }}</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- 全局单例高清趋势浮动视窗 (极速渲染·零卡顿 120 FPS 架构) -->
+        <div class="fixed z-[99999] transition-all duration-150 ease-out transform origin-center"
+             :class="trendTooltipVisible ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'"
+             :style="{ left: trendTooltipPos.left, top: trendTooltipPos.top, width: '320px' }"
+             @mouseenter="cancelHideTrendPreview"
+             @mouseleave="hideTrendPreview">
+            <div v-if="trendTooltipItem" class="bg-white/95 backdrop-blur-md text-slate-800 text-xs rounded-2xl p-3.5 shadow-2xl border border-slate-200 text-left select-none">
+                
+                <!-- 头部信息：SKU/ASIN 与走势徽章 -->
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                    <div class="truncate max-w-[200px]">
+                        <span class="font-bold text-slate-800 text-xs font-mono block truncate">{{ trendTooltipItem.sku || trendTooltipItem.asin }}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">{{ trendTooltipItem.country }} · {{ trendTooltipItem.store }}</span>
+                    </div>
+                    <span v-if="trendTooltipItem.isNewVersion && trendTooltipItem.newTrendData" 
+                          class="text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0"
+                          :class="trendTooltipItem.newTrendData.colorType === 'rising' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : (trendTooltipItem.newTrendData.colorType === 'falling' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-200')">
+                        {{ trendTooltipItem.newTrendData.trendText }}
+                    </span>
+                    <span v-else class="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
+                        30天走势
+                    </span>
+                </div>
+
+                <!-- 视图 A：多周期聚合表的 3 阶段高清走势 -->
+                <div v-if="trendTooltipItem.isNewVersion && trendTooltipItem.newTrendData" class="space-y-2">
+                    <div class="bg-slate-50/80 rounded-xl p-2 border border-slate-100 flex items-center justify-center">
+                        <svg class="w-full h-16 block overflow-visible select-none" viewBox="0 0 100 30" preserveAspectRatio="none">
+                            <line x1="4" y1="28" x2="96" y2="28" stroke="#cbd5e1" stroke-width="0.8" stroke-linecap="round"/>
+                            
+                            <!-- 柱 1: 近 7 天 -->
+                            <rect x="8" :y="28 - trendTooltipItem.newTrendData.h1" width="18" :height="trendTooltipItem.newTrendData.h1" rx="2" 
+                                  :fill="trendTooltipItem.newTrendData.c1" />
+                            
+                            <!-- 柱 2: 8~14 天前 -->
+                            <rect x="41" :y="28 - trendTooltipItem.newTrendData.h2" width="18" :height="trendTooltipItem.newTrendData.h2" rx="2" 
+                                  :fill="trendTooltipItem.newTrendData.c2" opacity="0.9" />
+                            
+                            <!-- 柱 3: 15~30 天前 -->
+                            <rect x="74" :y="28 - trendTooltipItem.newTrendData.h3" width="18" :height="trendTooltipItem.newTrendData.h3" rx="2" 
+                                  :fill="trendTooltipItem.newTrendData.c3" opacity="0.85" />
+
+                            <!-- 顶端流线与圆点 -->
+                            <path :d="trendTooltipItem.newTrendData.linePath" fill="none" :stroke="trendTooltipItem.newTrendData.strokeColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+                            <circle :cx="17" :cy="28 - trendTooltipItem.newTrendData.h1" r="2.5" :fill="trendTooltipItem.newTrendData.strokeColor"/>
+                            <circle :cx="50" :cy="28 - trendTooltipItem.newTrendData.h2" r="2" :fill="trendTooltipItem.newTrendData.strokeColor"/>
+                            <circle :cx="83" :cy="28 - trendTooltipItem.newTrendData.h3" r="2" :fill="trendTooltipItem.newTrendData.strokeColor"/>
+                        </svg>
+                    </div>
+
+                    <!-- 3 阶段数据详情卡片 -->
+                    <div class="grid grid-cols-3 gap-1.5 text-center text-[10px]">
+                        <div class="bg-blue-50/70 border border-blue-100 rounded-lg p-1.5">
+                            <div class="text-slate-500 font-medium">近 7 天</div>
+                            <div class="text-blue-600 font-bold text-xs">{{ trendTooltipItem.newTrendData.avg1.toFixed(1) }} <span class="text-[9px] font-normal">件/天</span></div>
+                            <div class="text-slate-400 text-[9px]">共 {{ trendTooltipItem.newTrendData.q1 }} 件</div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-lg p-1.5">
+                            <div class="text-slate-500 font-medium">8~14 天前</div>
+                            <div class="text-slate-700 font-bold text-xs">{{ trendTooltipItem.newTrendData.avg2.toFixed(1) }} <span class="text-[9px] font-normal">件/天</span></div>
+                            <div class="text-slate-400 text-[9px]">共 {{ trendTooltipItem.newTrendData.q2 }} 件</div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 rounded-lg p-1.5">
+                            <div class="text-slate-500 font-medium">15~30 天前</div>
+                            <div class="text-slate-700 font-bold text-xs">{{ trendTooltipItem.newTrendData.avg3.toFixed(1) }} <span class="text-[9px] font-normal">件/天</span></div>
+                            <div class="text-slate-400 text-[9px]">共 {{ trendTooltipItem.newTrendData.q3 }} 件</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视图 B：30 天流水表的高清交互折线图 -->
+                <div v-else-if="trendTooltipItem.salesTrend && trendTooltipItem.salesTrend.length > 0" class="space-y-2">
+                    <!-- 实时交互显示当前悬浮点的日期与销量 -->
+                    <div class="flex justify-between items-center bg-blue-50/80 px-2.5 py-1.5 rounded-lg border border-blue-100 text-[11px]">
+                        <span class="text-slate-600 font-medium flex items-center gap-1">
+                            📅 {{ trendHoverPoint ? trendHoverPoint.date : '在下方划动查看' }}
+                        </span>
+                        <span v-if="trendHoverPoint" class="text-blue-700 font-bold text-sm">
+                            {{ trendHoverPoint.val }} <span class="text-[10px] font-normal">件</span>
+                        </span>
+                        <span v-else class="text-slate-400 text-[10px]">
+                            月销: {{ trendTooltipItem.monthlySales }} 件
+                        </span>
+                    </div>
+
+                    <!-- 高清可交互 SVG 折线图 -->
+                    <div class="relative bg-slate-50/80 rounded-xl p-2 border border-slate-100 cursor-crosshair overflow-hidden"
+                         @mousemove="handleSparklineMouseMove($event, trendTooltipItem)">
+                        <svg class="w-full h-16 block overflow-visible select-none" viewBox="0 0 100 30" preserveAspectRatio="none">
+                            <path :d="trendTooltipItem.sparklineFill" class="fill-blue-500/15 border-0 stroke-none"></path>
+                            <path :d="trendTooltipItem.sparklinePath" class="stroke-blue-500 fill-none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                            
+                            <!-- 交互十字准线与圆点 -->
+                            <g v-if="trendHoverPoint && trendTooltipItem.sparklinePoints && trendTooltipItem.sparklinePoints[trendHoverPoint.index]">
+                                <line :x1="trendTooltipItem.sparklinePoints[trendHoverPoint.index].x" y1="0" 
+                                      :x2="trendTooltipItem.sparklinePoints[trendHoverPoint.index].x" y2="30" 
+                                      stroke="#3b82f6" stroke-width="1" stroke-dasharray="2,2" />
+                                <circle :cx="trendTooltipItem.sparklinePoints[trendHoverPoint.index].x" 
+                                        :cy="trendTooltipItem.sparklinePoints[trendHoverPoint.index].y" 
+                                        r="3.5" class="fill-blue-600 stroke-2 stroke-white shadow" />
+                            </g>
+                        </svg>
+                    </div>
+
+                    <!-- 底部关键指标摘要 -->
+                    <div class="flex justify-between items-center text-[10px] text-slate-500 px-1">
+                        <span>7天日均: <strong class="text-slate-800">{{ trendTooltipItem.avg7.toFixed(1) }}</strong></span>
+                        <span>14天日均: <strong class="text-slate-800">{{ trendTooltipItem.avg14.toFixed(1) }}</strong></span>
+                        <span>30天日均: <strong class="text-slate-800">{{ trendTooltipItem.avg30.toFixed(1) }}</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 头部导航栏 -->
+        <header class="glass-panel rounded-2xl p-4 md:p-6 mb-4 flex flex-col z-10 relative flex-shrink-0">
+            <div class="flex items-center justify-between w-full flex-wrap gap-4">
+                <div class="flex-1 hidden xl:block"></div>
+<div class="flex items-center justify-center gap-2 flex-1 min-w-fit cursor-pointer hover:opacity-80 transition-opacity select-none" 
+     @click="isConfigCollapsed = !isConfigCollapsed" 
+     title="点击折叠/展开基础数据面板">
+    <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-3 whitespace-nowrap">
+        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+        智能补货辅助系统
+        <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono font-bold tracking-tight">v{{ CURRENT_VERSION }}</span>
+        <span v-if="updateInfo.hasUpdate" @click.stop="showUpdateModal = true" class="text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse shadow-sm flex items-center gap-1 cursor-pointer hover:bg-rose-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+            发现新版 v{{ updateInfo.latestVersion }}
+        </span>
+    </h1>
+    <svg class="w-5 h-5 text-slate-400 transition-transform duration-300" :class="{ 'rotate-180': isConfigCollapsed }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+</div>
+                <div class="flex items-center justify-end gap-2 xl:gap-3 flex-1 min-w-fit">
+                    <button @click="resetSalesData" v-if="processedData.length > 0" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors text-sm font-medium shadow-sm">
+                        清空重传销量
+                    </button>
+
+                    <!-- 新增：本地在途导入按钮 -->
+                    <label v-if="processedData.length > 0" class="cursor-pointer px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 transition-colors text-sm font-medium shadow-sm inline-flex items-center gap-1" title="支持导入带有SKU、MSKU以及待签收/已签收数量的在途表，自动累加匹配">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        本地在途导入
+                        <input type="file" class="hidden" accept=".csv, .xls, .xlsx" @change="handleInTransitFileUpload">
+                    </label>
+                    
+                    <button @click="exportExcel" v-if="processedData.length > 0" class="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-lg shadow-emerald-500/30 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        下载补货计划
+                    </button>
+
+                    <button @click="showSettings = true" class="p-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors shadow-sm" title="系统设置">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    </button>
+
+                    <button @click="showSOP = true" class="p-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors shadow-sm" title="SOP 规则">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="hasSkuData" v-show="!isConfigCollapsed" class="mt-4 bg-slate-50/70 p-3 md:p-4 rounded-xl border border-slate-200/50 text-xs text-slate-600 flex flex-col md:flex-row justify-center gap-4 md:gap-16 leading-relaxed relative origin-top">
+                <div class="absolute top-2 right-4 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded shadow-sm border border-blue-200 flex flex-col gap-1 text-right z-10 hidden xl:flex">
+                    <div>计算模式：{{ settings.salesCalcMethod === 'average' ? '常规(30天均值)' : `加权(7天${settings.weight7}%+14天${settings.weight14}%+30天${settings.weight30}%)` }}</div>
+                    <div v-if="settings.oosOptimizationEnabled" class="text-red-600 font-bold">已开启断货SKU优化</div>
+                </div>
+                <div class="absolute top-2 left-4 text-[10px] text-emerald-600 flex items-center gap-1 z-10 hidden xl:flex">
+                    <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span>
+                    基础数据已就绪
+                </div>
+                <div>
+                    <p class="font-bold text-indigo-600/90 mb-1.5 text-sm tracking-wide">迪拜补货：</p>
+                    <p class="mb-1">
+                        <span class="inline-block text-slate-500 text-base">✈️</span> 
+                        <span class="text-red-500 font-bold">警戒水位：</span>在售+在途 = <span class="text-blue-600 font-bold">{{ settings.uaeAirLeadTime + settings.safeStock }}</span> 天 <span class="text-slate-300 mx-2">|</span> 爆款补 <span class="text-emerald-600 font-bold">{{ settings.baoRestockDays }}</span> 天，旺款补 <span class="text-emerald-600 font-bold">{{ settings.wangRestockDays }}</span> 天，平款 <span class="text-emerald-600 font-bold">{{ settings.normalRestockDays }}</span> 天
+                    </p>
+                    <p>
+                        <span class="inline-block text-slate-500 text-base">🚢</span> 
+                        <span class="text-red-500 font-bold">警戒水位：</span>在售+在途 = <span class="text-blue-600 font-bold">{{ settings.uaeSeaLeadTime + settings.safeStock }}</span> 天 <span class="text-slate-300 mx-2">|</span> 爆款补 <span class="text-emerald-600 font-bold">{{ settings.baoRestockDays }}</span> 天，旺款补 <span class="text-emerald-600 font-bold">{{ settings.wangRestockDays }}</span> 天，平款 <span class="text-emerald-600 font-bold">{{ settings.normalRestockDays }}</span> 天
+                    </p>
+                </div>
+                <div class="hidden md:block w-px bg-slate-200"></div>
+                <div>
+                    <p class="font-bold text-amber-600/90 mb-1.5 text-sm tracking-wide">沙特补货：</p>
+                    <p class="mb-1">
+                        <span class="inline-block text-slate-500 text-base">✈️</span> 
+                        <span class="text-red-500 font-bold">警戒水位：</span>在售+在途 = <span class="text-blue-600 font-bold">{{ settings.ksaAirLeadTime + settings.safeStock }}</span> 天 <span class="text-slate-300 mx-2">|</span> 爆款补 <span class="text-emerald-600 font-bold">{{ settings.baoRestockDays }}</span> 天，旺款补 <span class="text-emerald-600 font-bold">{{ settings.wangRestockDays }}</span> 天，平款 <span class="text-emerald-600 font-bold">{{ settings.normalRestockDays }}</span> 天
+                    </p>
+                    <p>
+                        <span class="inline-block text-slate-500 text-base">🚢</span> 
+                        <span class="text-red-500 font-bold">警戒水位：</span>在售+在途 = <span class="text-blue-600 font-bold">{{ settings.ksaSeaLeadTime + settings.safeStock }}</span> 天 <span class="text-slate-300 mx-2">|</span> 爆款补 <span class="text-emerald-600 font-bold">{{ settings.baoRestockDays }}</span> 天，旺款补 <span class="text-emerald-600 font-bold">{{ settings.wangRestockDays }}</span> 天，平款 <span class="text-emerald-600 font-bold">{{ settings.normalRestockDays }}</span> 天
+                    </p>
+                </div>
+            </div>
+        </header>
+
+        <!-- 第 1 步：全局初始化 -->
+        <div v-if="!hasSkuData" class="glass-panel rounded-2xl p-16 text-center mt-6 border-dashed border-2 z-0 relative transition-all duration-300 shadow-2xl flex-shrink-0"
+             :class="isDragOver ? 'border-purple-500 bg-purple-50/50 scale-[1.01]' : 'border-slate-300'"
+             @dragover.prevent="isDragOver = true"
+             @dragleave.prevent="isDragOver = false"
+             @drop.prevent="handleSkuFileDrop">
+            <svg class="w-24 h-24 mx-auto mb-6 text-purple-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <h2 class="text-3xl font-bold mb-3 text-slate-800">系统初始化：导入马帮 SKU 数据库</h2>
+            <p class="text-slate-500 mb-8 max-w-2xl mx-auto leading-relaxed">
+                这是您第一次使用本系统。<br>请上传或拖拽<strong class="text-purple-600">《马帮库存 SKU 表》</strong>，系统将提取并永久保存 SKU 的图片、状态、分类标签、重量(g)及商品体积重(kg)。之后仅需上传销量表即可。
+            </p>
+            <label class="cursor-pointer bg-purple-600 hover:bg-purple-700 text-white px-10 py-4 rounded-xl font-medium transition-colors shadow-lg shadow-purple-500/30 inline-flex items-center gap-2 text-lg">
+                上传马帮 SKU 基础表
+                <input type="file" class="hidden" accept=".csv, .xls, .xlsx" @change="handleSkuFileUpload">
+            </label>
+        </div>
+
+        <!-- 第 2 步：工作台 -->
+        <div v-else class="flex-1 flex flex-col min-h-0">
+            <!-- 日常传销量表大区域 (如果无数据) -->
+            <div v-if="processedData.length === 0" class="glass-panel rounded-2xl p-16 text-center border-dashed border-2 z-0 relative transition-all duration-300"
+                 :class="isDragOver ? 'border-blue-500 bg-blue-50/50 scale-[1.01]' : 'border-slate-300'"
+                 @dragover.prevent="isDragOver = true"
+                 @dragleave.prevent="isDragOver = false"
+                 @drop.prevent="handleSalesFileDrop">
+                <svg class="w-20 h-20 mx-auto mb-6 text-blue-500 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                <h2 class="text-2xl font-bold mb-2 text-slate-700">请上传或拖拽今日《亚马逊销量统计表》</h2>
+                <p class="text-slate-500 mb-6">纯本地极速计算，系统将自动进行同 ASIN 跨店数据聚合，并匹配图片与标签！</p>
+                <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium transition-colors shadow-lg shadow-blue-500/30 inline-flex items-center gap-2">
+                    点击选择销量表
+                    <input type="file" class="hidden" accept=".csv, .xls, .xlsx" @change="handleSalesFileUpload">
+                </label>
+            </div>
+
+            <!-- 数据展示表格区 -->
+            <main v-else class="glass-panel rounded-2xl overflow-hidden shadow-lg relative flex flex-col flex-1 min-h-0 bg-white">
+                <!-- 工具栏 -->
+                <div class="bg-white/50 border-b border-slate-200 p-4 flex flex-col xl:flex-row justify-between items-center gap-4 flex-wrap flex-shrink-0 z-20">
+                    <div class="flex items-center gap-4 w-full xl:w-auto flex-wrap">
+                        <label class="flex items-center gap-2 cursor-pointer shrink-0">
+                            <input type="checkbox" v-model="hideSafe" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                            <span class="text-sm font-medium text-slate-700">仅显示需补货 (隐藏安全库存)</span>
+                        </label>
+                        
+                        <!-- 新增：SKU/ASIN 智能搜索框 -->
+                        <div class="flex items-center rounded-md shadow-sm border border-slate-300 bg-white overflow-hidden hover:border-blue-400 focus-within:border-blue-500 transition-colors h-8">
+                            <select v-model="searchType" class="px-2 h-full text-sm text-slate-600 bg-slate-50 border-r border-slate-300 outline-none cursor-pointer">
+                                <option value="sku">SKU</option>
+                                <option value="asin">ASIN</option>
+                            </select>
+                            <input type="text" v-model="searchQuery" placeholder="输入搜索内容..." class="px-2 h-full text-sm outline-none w-32 md:w-48 placeholder-slate-400">
+                        </div>
+
+                        <div class="text-sm text-slate-500 shrink-0 border-l border-slate-300 pl-4">
+                            筛选结果：<span class="font-bold text-red-500">{{ needRestockCount }}</span> 条需处理
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 shrink-0 flex-wrap">
+                        <select v-model="batchLogistics" @change="applyBatchLogistics" class="text-sm border-slate-300 rounded-md py-1.5 pl-2 pr-6 border bg-white shadow-sm hover:border-blue-400 cursor-pointer outline-none transition-colors">
+                            <option value="">批量应用空/海运...</option>
+                            <option value="空运">全部设为空运</option>
+                            <option value="海运">全部设为海运</option>
+                            <option value="空海结合">全部设为空海结合</option>
+                        </select>
+                        <select v-model="batchType" @change="applyBatchType" class="text-sm border-slate-300 rounded-md py-1.5 pl-2 pr-6 border bg-white shadow-sm hover:border-blue-400 cursor-pointer outline-none transition-colors">
+                            <option value="">批量应用款式...</option>
+                            <option value="爆款">全部设为爆款</option>
+                            <option value="旺款">全部设为旺款</option>
+                            <option value="平款">全部设为平款</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 核心数据表格 -->
+                <div class="table-container bg-white relative">
+                    <table class="w-full text-left min-w-max border-separate border-spacing-0">
+                        <thead>
+                            <tr class="text-slate-600 text-xs uppercase tracking-wider">
+                                <th class="sticky-header p-3 font-semibold text-center w-10 align-middle">
+                                    <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected" class="rounded border-slate-300">
+                                </th>
+                                
+                                <th v-resizable data-col="sku" class="sticky-header p-2 font-semibold min-w-[6rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
+                                        <select v-model="filterNewProduct" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                            <option value="" class="text-slate-700">全部SKU</option>
+                                            <option value="new" class="text-green-600">🆕 新品</option>
+                                            <option value="old" class="text-slate-700">老品</option>
+                                        </select>
+                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </th>
+                                <th class="sticky-header p-3 font-semibold w-16 align-middle text-center whitespace-nowrap">图片</th>
+                                <th class="sticky-header p-3 font-semibold min-w-[6rem] align-middle whitespace-nowrap">ASIN</th>
+                                <th v-resizable data-col="price" class="sticky-header p-3 font-semibold text-center min-w-[6rem] align-middle whitespace-nowrap">售价</th>
+                                <th v-resizable data-col="cost" class="sticky-header p-3 font-semibold text-center min-w-[6.5rem] align-middle whitespace-nowrap" title="根据国家与店铺智能匹配对应仓库成本，悬浮查看全仓明细">SKU成本</th>
+                                
+                                <th v-resizable data-col="status" class="sticky-header p-2 font-semibold text-center min-w-[6rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
+                                        <select v-model="filterStatus" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                            <option value="" class="text-slate-700">全部状态</option>
+                                            <option v-for="status in uniqueStatuses" :key="status" :value="status" class="text-slate-700">{{ status }}</option>
+                                        </select>
+                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </th>
+                                <th class="sticky-header p-3 font-semibold min-w-[6rem] align-middle text-center whitespace-nowrap">分类标签</th>
+                                
+                                <th class="sticky-header p-2 font-semibold text-center min-w-[5rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
+                                        <select v-model="filterCountry" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                            <option value="" class="text-slate-700">全部区域</option>
+                                            <option value="迪拜" class="text-slate-700">迪拜</option>
+                                            <option value="沙特" class="text-slate-700">沙特</option>
+                                            <option v-if="settings.showKsaCrossBorder" value="沙特(跨国)" class="text-slate-700">沙特(跨国)</option>
+                                        </select>
+                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </th>
+                                
+                                <th class="sticky-header p-3 font-semibold text-center min-w-[6rem] cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle relative whitespace-nowrap" @click="sortByField('calculatedMonthlySales')" title="表格显示原月销，后台按您选择的算法重算日均">
+                                    <div class="flex items-center justify-center gap-1">
+                                        近30天销
+                                        <span class="text-slate-400 group-hover:text-blue-500" :class="{'text-blue-600 font-bold': sortField === 'calculatedMonthlySales'}">
+                                            {{ sortField === 'calculatedMonthlySales' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}
+                                        </span>
+                                    </div>
+                                </th>
+                                
+                                <th class="sticky-header p-3 font-semibold text-center min-w-[5rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">FBA在售✎</th>
+                                <th class="sticky-header p-3 font-semibold text-center min-w-[5rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">采购在途✎</th>
+                                
+                                <th v-resizable data-col="logistics" class="sticky-header p-2 font-semibold text-center min-w-[5.5rem] w-24 align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
+                                        <select v-model="filterLogistics" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                            <option value="" class="text-slate-700">全部物流</option>
+                                            <option value="空运" class="text-slate-700">✈️ 空运</option>
+                                            <option value="海运" class="text-slate-700">🚢 海运</option>
+                                            <option value="空海结合" class="text-slate-700">✈️🚢 空海结合</option>
+                                        </select>
+                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </th>
+                                
+                                <th v-resizable data-col="type" class="sticky-header p-2 font-semibold text-center min-w-[7rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
+                                    <select v-model="filterItemType" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                        <option value="" class="text-slate-700">全部款式</option>
+                                        <option value="爆款" class="text-slate-700">🔥 爆款</option>
+                                        <option value="旺款" class="text-slate-700">✨ 旺款</option>
+                                        <option value="平款" class="text-slate-700">📦 平款</option>
+                                        </select>
+                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    </div>
+                                </th>
+                                
+                                <th v-resizable data-col="days" class="sticky-header p-3 font-semibold text-center min-w-[5rem] text-blue-600 align-middle whitespace-nowrap">预计可售天数</th>
+                                
+                                <th v-resizable data-col="restock" class="sticky-header p-3 font-semibold text-center min-w-[6rem] text-emerald-600 cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle whitespace-nowrap" @click="sortByField('suggestedRestock')" title="点击排序">
+                                    <div class="flex items-center justify-center gap-1">
+                                        建议补货量
+                                        <span class="text-slate-400 group-hover:text-emerald-500" :class="{'text-emerald-600 font-bold': sortField === 'suggestedRestock'}">
+                                            {{ sortField === 'suggestedRestock' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}
+                                        </span>
+                                    </div>
+                                </th>
+
+                                <!-- 新增：实际补货量输入列 -->
+                                <th v-resizable data-col="actual" class="sticky-header p-3 font-semibold text-center min-w-[6rem] text-indigo-600 align-middle whitespace-nowrap" title="运营实际落地的采购数量，可导出">实际补货量</th>
+                                
+                                <th v-resizable data-col="trend" class="sticky-header p-3 font-semibold text-center min-w-[8rem] align-middle text-slate-500 whitespace-nowrap">30天趋势</th>
+                                
+                                <th class="sticky-header p-3 font-semibold text-center w-16 align-middle text-red-400 whitespace-nowrap">操作</th>
+                            </tr>
+                        </thead>
+                        
+                        <tbody>
+                            <tr v-for="item in paginatedData" :key="item.id" 
+                                class="hover:bg-blue-50/40 transition-colors"
+                                :class="{'bg-red-50/50': item.suggestedRestock > 0 && !item.isOosOptimized, 'bg-amber-50/70': item.isOosOptimized && item.suggestedRestock > 0, 'opacity-75': item.suggestedRestock === 0}">
+                                
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <input type="checkbox" v-model="item.selected" class="rounded border-slate-300">
+                                </td>
+                                
+                                <td class="p-3 text-sm font-medium text-slate-800 break-all align-middle border-b border-slate-100" :title="'品名: ' + (item.name || '-') + '\nSKU: ' + (item.sku || '-') + '\nMSKU: ' + (item.msku || '-')">
+                                    <div class="relative inline-block cursor-help">
+                                        <span class="hover:text-blue-600 transition-colors">{{ item.sku || '-' }}</span>
+                                        <span v-if="item.isNewProduct" class="absolute -top-2 -right-5 bg-green-500 text-white text-[9px] px-1 rounded-sm font-bold shadow-sm select-none z-10 whitespace-nowrap">新</span>
+                                    </div>
+                                </td>
+                                
+                                <td class="p-2 text-center align-middle border-b border-slate-100 relative">
+                                    <img v-if="item.skuImage" :src="item.skuImage" 
+                                         @mouseenter="showPreview($event, item.skuImage)" 
+                                         @mouseleave="hidePreview"
+                                         class="w-10 h-10 aspect-square object-cover rounded shadow-sm border border-slate-200 mx-auto bg-white cursor-zoom-in" onerror="this.style.display='none'">
+                                    <div v-if="!item.skuImage" class="w-10 h-10 aspect-square bg-slate-100 rounded border border-slate-200 mx-auto flex items-center justify-center text-[8px] text-slate-400">无图</div>
+                                </td>
+                                
+                                <td class="p-3 text-xs align-middle border-b border-slate-100">
+                                  <a v-if="item.asin" 
+                                     :href="getAmazonUrl(item.asin, item.country)" 
+                                     target="_blank" 
+                                     class="text-blue-500 hover:text-blue-700 font-medium hover:underline transition-colors"
+                                     :title="'点击前往亚马逊前台查看: ' + item.asin">
+                                      {{ item.asin }}
+                                  </a>
+                                  <span v-else class="text-slate-400">-</span>
+                              </td>
+
+                                <!-- 新增：售价列与亏本预警 -->
+                                <td class="p-3 text-center align-middle border-b border-slate-100 whitespace-nowrap">
+                                    <div v-if="item.price !== null" class="flex flex-col items-center justify-center">
+                                        <span class="font-bold text-slate-800 text-sm">¥{{ item.price.toFixed(2) }}</span>
+                                        <div v-if="item.lossWarning && item.lossWarning.isLoss" class="mt-0.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 cursor-help" title="⚠️ 留意是否亏本">
+                                            <span>⚠️ 留意是否亏本</span>
+                                        </div>
+                                    </div>
+                                    <span v-else class="text-slate-400 font-mono">-</span>
+                                </td>
+
+                                <!-- 新增：SKU成本列与多仓成本悬浮 -->
+                                <td class="p-3 text-center align-middle border-b border-slate-100 whitespace-nowrap">
+                                    <div v-if="item.skuCost !== null" class="flex flex-col items-center justify-center cursor-help group" :title="getWarehouseCostTooltip(item)">
+                                        <span class="font-bold text-indigo-700 text-sm hover:underline">¥{{ formatSkuCost(item.skuCost) }}</span>
+                                        <span class="text-[10px] text-slate-400 flex items-center gap-0.5">
+                                            {{ item.matchedCostInfo.usedWarehouse }}
+                                            <span v-if="item.matchedCostInfo.isFallback" class="text-amber-500 font-bold">(保底)</span>
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-slate-400 font-mono">-</span>
+                                </td>
+                                
+                                <td class="p-3 text-center text-xs font-medium align-middle border-b border-slate-100">
+                                    <span v-if="item.skuStatus" class="px-2 py-1 rounded border inline-block whitespace-nowrap" :class="getStatusClass(item.skuStatus)">
+                                        {{ item.skuStatus }}
+                                    </span>
+                                    <span v-else class="text-slate-300">-</span>
+                                </td>
+                                <td class="p-3 text-center align-middle text-[10px] border-b border-slate-100">
+                                    <div v-if="item.skuCategory" class="flex flex-wrap justify-center gap-1">
+                                        <span v-for="cat in item.skuCategory.split(', ')" :key="cat" class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+                                            {{ cat }}
+                                        </span>
+                                    </div>
+                                    <span v-else class="text-slate-300">-</span>
+                                </td>
+
+                                <td class="p-3 text-sm font-semibold text-center align-middle border-b border-slate-100">
+                                    <span :class="item.country === '迪拜' ? 'text-indigo-600' : (item.country === '沙特(跨国)' ? 'text-purple-600' : 'text-amber-600')" :title="item.store">
+                                        {{ item.country }}
+                                    </span>
+                                </td>
+                                
+                                <td class="p-3 text-center text-sm font-medium cursor-help group relative align-middle border-b border-slate-100">
+                                    <span class="border-b border-dashed border-slate-400 pb-0.5">
+                                        {{ Math.round(item.calculatedMonthlySales) }}
+                                    </span>
+                                    <span class="hidden group-hover:inline-block absolute bg-slate-800 text-white text-[10px] px-2 py-1.5 rounded-md -mt-8 ml-4 z-50 shadow-lg whitespace-pre text-left">
+                                        {{ item.monthlySalesTooltip }}
+                                    </span>
+                                </td>
+                                
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <div class="flex items-center justify-center">
+                                        <input type="number" v-model.number="item.tempFbaStock" @keyup.enter="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock" class="editable-input text-sm text-slate-700 w-16">
+                                        <div class="w-6 flex justify-center shrink-0">
+                                            <button v-if="item.tempFbaStock !== item.fbaStock" @click="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <div class="flex items-center justify-center">
+                                        <input type="number" v-model.number="item.tempOnTheWay" @keyup.enter="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay" class="editable-input text-sm text-slate-700 placeholder-slate-300 w-16" placeholder="填数量">
+                                        <div class="w-6 flex justify-center shrink-0">
+                                            <button v-if="item.tempOnTheWay !== item.onTheWay" @click="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-2 text-center align-middle border-b border-slate-100 w-24 whitespace-nowrap">
+                                    <select v-model="item.logistics" class="editable-input text-xs cursor-pointer hover:border-blue-400 py-1 px-1 w-20 mx-auto block" :class="{'danger-select': item.hasWeightError}">
+                                        <option value="空运">✈️ 空运</option>
+                                        <option value="海运">🚢 海运</option>
+                                        <option value="空海结合">✈️🚢 空海结合</option>
+                                    </select>
+                                    <!-- 当重量或体积重为0/缺失时的醒目提醒 -->
+                                    <div v-if="item.weightErrorMsg" class="text-[9px] text-red-500 mt-1 font-bold bg-red-50 py-0.5 px-1 rounded border border-red-200 inline-block shadow-sm leading-tight max-w-[5.5rem] truncate cursor-help" :title="'⚠️ ' + item.weightErrorMsg + '\n重量或商品体积重为0/空，代表马帮尚未录入真实数据，请及时校对补全！'">
+                                        ⚠️ {{ item.weightErrorMsg }}
+                                    </div>
+                                    
+                                    <!-- 海运断货风险提醒与改空运紧凑按钮 (移至顶层 fixed 卡片展示，杜绝遮挡) -->
+                                    <div v-if="item.urgentAirRisk" class="mt-1 flex justify-center">
+                                        <button @click="item.logistics = '空运'" 
+                                                @mouseenter="showAirTooltip($event, item)" 
+                                                @mouseleave="hideAirTooltip"
+                                                class="text-[10px] bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-bold px-2 py-0.5 rounded shadow-sm inline-flex items-center gap-1 transition-all hover:scale-105 active:scale-95 animate-pulse hover:animate-none cursor-pointer whitespace-nowrap" 
+                                                title="点击一键切换为空运">
+                                            <span>⚡ 改空运</span>
+                                            <span v-if="item.urgentAirCostDiff.totalDiff > 0 && !item.urgentAirCostDiff.isMissingData" class="text-[9px] bg-black/20 px-1 rounded leading-tight">+¥{{ Math.round(item.urgentAirCostDiff.totalDiff) }}</span>
+                                            <span v-else-if="item.urgentAirCostDiff.isMissingData" class="text-[9px] bg-red-900/60 px-1 rounded leading-tight">缺数据</span>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <select v-model="item.itemType" class="editable-input text-xs cursor-pointer hover:border-blue-400">
+                                        <option value="爆款">🔥 爆款</option>
+                                        <option value="旺款">✨ 旺款</option>
+                                        <option value="平款">📦 平款</option>
+                                    </select>
+                                </td>
+
+                                <td class="p-3 text-center font-bold align-middle border-b border-slate-100" :class="item.availableDays < item.triggerDays ? 'text-red-500' : 'text-green-600'">
+                                    {{ item.availableDays === Infinity ? '999+' : item.availableDays.toFixed(1) }}天
+                                    <div class="text-[10px] text-slate-400 font-normal">阈值:{{ item.triggerDays }}天</div>
+                                </td>
+                                <td class="p-3 text-center font-bold text-lg cursor-help group relative align-middle border-b border-slate-100" :title="item.restockTooltip">
+                                    <div class="flex items-center justify-center gap-1.5 border-b border-dashed border-transparent hover:border-slate-400 pb-0.5">
+                                        <span v-if="item.isOosOptimized" class="text-[10px] bg-red-100 border border-red-200 text-red-600 px-1 py-0.5 rounded shadow-sm leading-none shrink-0" title="已触发断货补货特殊优化">断货</span>
+                                        <span :class="item.suggestedRestock > 0 ? (item.isOosOptimized ? 'text-orange-600' : 'text-emerald-600') : 'text-slate-400'">
+                                            {{ item.suggestedRestock }}
+                                        </span>
+                                    </div>
+                                    <span class="hidden group-hover:inline-block absolute bg-slate-800 text-white text-[10px] px-2 py-1.5 rounded-md -mt-10 ml-0 z-50 shadow-lg whitespace-pre text-left leading-relaxed">
+                                        {{ item.restockTooltip }}
+                                    </span>
+                                </td>
+                                
+                                <!-- 新增：实际补货量 -->
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <input type="number" v-model.number="item.actualRestock" class="editable-input text-sm text-indigo-700 font-bold bg-indigo-50/50 w-20 shadow-inner" placeholder="填入数量">
+                                </td>
+
+                                <td class="p-3 text-center align-middle border-b border-slate-100"
+                                    @mouseenter="showTrendPreview($event, item)"
+                                    @mousemove="handleCellMouseMove($event, item)"
+                                    @mouseleave="hideTrendPreview">
+                                    <div class="flex flex-col items-center justify-center cursor-pointer">
+                                        <!-- 方案 A：多周期聚合表的 3 阶段独立时序微图 (极简矢量·近7天在最左边) -->
+                                        <svg v-if="item.isNewVersion && item.newTrendData" 
+                                             class="w-20 h-7 block overflow-visible select-none pointer-events-none" 
+                                             viewBox="0 0 100 30" 
+                                             preserveAspectRatio="none">
+                                            <!-- 基准底线 -->
+                                            <line x1="4" y1="28" x2="96" y2="28" stroke="#e2e8f0" stroke-width="1" stroke-linecap="round"/>
+                                            <!-- 柱 1: 近7天 (最左边 x=6) -->
+                                            <rect x="6" :y="28 - item.newTrendData.h1" width="20" :height="item.newTrendData.h1" rx="2" :fill="item.newTrendData.c1" />
+                                            <!-- 柱 2: 8~14天前 (中间 x=40) -->
+                                            <rect x="40" :y="28 - item.newTrendData.h2" width="20" :height="item.newTrendData.h2" rx="2" :fill="item.newTrendData.c2" opacity="0.9" />
+                                            <!-- 柱 3: 15~30天前 (最右边 x=74) -->
+                                            <rect x="74" :y="28 - item.newTrendData.h3" width="20" :height="item.newTrendData.h3" rx="2" :fill="item.newTrendData.c3" opacity="0.85" />
+                                            <!-- 顶端流线与圆点 -->
+                                            <path :d="item.newTrendData.linePath" fill="none" :stroke="item.newTrendData.strokeColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+                                            <circle :cx="16" :cy="28 - item.newTrendData.h1" r="2" :fill="item.newTrendData.strokeColor"/>
+                                            <circle :cx="50" :cy="28 - item.newTrendData.h2" r="1.5" :fill="item.newTrendData.strokeColor"/>
+                                            <circle :cx="84" :cy="28 - item.newTrendData.h3" r="1.5" :fill="item.newTrendData.strokeColor"/>
+                                        </svg>
+
+                                        <!-- 按日细分表的真实 30 天折线趋势 (极简双路径·零DOM开销) -->
+                                        <svg v-else-if="item.salesTrend && item.salesTrend.length > 0" 
+                                             class="w-20 h-7 block overflow-visible select-none pointer-events-none" 
+                                             viewBox="0 0 100 30" 
+                                             preserveAspectRatio="none">
+                                            <path :d="item.sparklineFill" class="fill-blue-400 opacity-20 border-0 stroke-none"></path>
+                                            <path :d="item.sparklinePath" class="stroke-blue-500 fill-none" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path>
+                                        </svg>
+                                        <div v-else class="text-[10px] text-slate-300 font-mono">-</div>
+
+                                        <span v-if="item.isHighVolatile" class="text-[9px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded border border-orange-200 leading-none whitespace-nowrap mt-0.5" title="近期存在单日异常爆发，建议核查是否为集中扫货">
+                                            ⚠️波动异常
+                                        </span>
+                                    </div>
+                                </td>
+                                
+                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                    <button @click="removeRow(item)" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="移除此行数据">
+                                        <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分页控制栏 -->
+                <div class="bg-slate-50 border-t border-slate-200 p-3 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-600 flex-shrink-0 z-20">
+                    <div class="flex items-center gap-2">
+                        <span>每页显示</span>
+                        <select v-model="pageSize" @change="currentPage = 1" class="border border-slate-300 rounded px-2 py-1 outline-none hover:border-blue-400 bg-white shadow-sm cursor-pointer">
+                            <option :value="50">50 条</option>
+                            <option :value="100">100 条</option>
+                            <option :value="200">200 条</option>
+                            <option :value="500">500 条</option>
+                        </select>
+                        <span>总计 <span class="font-bold text-slate-800">{{ filteredAndSortedData.length }}</span> 项结果</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button @click="currentPage > 1 && currentPage--" :disabled="currentPage === 1" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">上一页</button>
+                        <span class="px-4 py-1.5 font-medium tracking-widest text-slate-700">第 {{ currentPage }} / {{ totalPages }} 页</span>
+                        <button @click="currentPage < totalPages && currentPage++" :disabled="currentPage === totalPages" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm font-medium">下一页</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- 悬浮设置面板 -->
+        <transition name="fade">
+            <div v-show="showSettings" v-drag class="fixed top-1/2 left-1/2 w-[460px] bg-white/95 backdrop-blur-xl shadow-2xl z-50 rounded-2xl border border-slate-200 flex flex-col max-h-[90vh] -translate-x-1/2 -translate-y-1/2">
+                <div class="drag-handle bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center select-none active:bg-slate-200 transition-colors shrink-0">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2 pointer-events-none">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        算法参数与系统设置
+                    </h2>
+                    <button @click="showSettings = false" class="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-slate-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto space-y-4 flex-1">
+                    <div class="p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                        <h3 class="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>底层 SKU 数据库</span>
+                            <button v-if="hasSkuData" @click="clearSkuBaseData" class="text-[10px] bg-white border border-purple-200 text-purple-600 px-2 py-1 rounded hover:bg-purple-600 hover:text-white transition-colors">
+                                清空重传 SKU 库
+                            </button>
+                        </h3>
+                        <p class="text-[10px] text-slate-500">此库包含了商品图片、状态、分类、重量(g)和商品体积重(kg)。清空后需重新导入《马帮库存 SKU 表》。当前状态：<strong :class="hasSkuData ? 'text-emerald-600' : 'text-red-500'">{{ hasSkuData ? '已加载' : '未导入' }}</strong></p>
+                    </div>
+                    
+                    <div class="p-4 bg-red-50/50 rounded-xl border border-red-100">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-red-500 uppercase tracking-wider flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                开启断货 SKU 补货优化 (FBA在售为0)
+                            </h3>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" v-model="settings.oosOptimizationEnabled" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
+                            </label>
+                        </div>
+                        <div v-if="settings.oosOptimizationEnabled" class="flex flex-col gap-2 mt-2 pt-3 border-t border-red-100/50">
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" v-model="settings.oosCalcMethod" :value="1" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <span class="text-xs text-slate-700 leading-tight font-medium">物流时间 + 安全缓冲 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">仅补足警戒水位：(物流天数+安全天数)×日销 - 在途</span></span>
+                            </label>
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" v-model="settings.oosCalcMethod" :value="2" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <span class="text-xs text-slate-700 leading-tight font-medium">月销量 + 安全缓冲 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">月销垫底：月销量 + (安全天数×日销) - 在途</span></span>
+                            </label>
+                            <label class="flex items-start gap-2 cursor-pointer">
+                                <input type="radio" v-model="settings.oosCalcMethod" :value="3" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <span class="text-xs text-slate-700 leading-tight font-medium">月销量 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">极简保守：月销量 - 在途</span></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                        <h3 class="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                            日均销量核算算法
+                        </h3>
+                        <div class="flex flex-col gap-3">
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-medium text-slate-600">SKU 新品判定时间</span>
+                                    <span class="text-xs font-bold text-indigo-600">{{ settings.newProductThresholdMonths }} 个月内</span>
+                                </div>
+                                <input type="range" v-model.number="settings.newProductThresholdMonths" min="3" max="24" step="1" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            </div>
+
+                            <label class="flex items-center gap-2 cursor-pointer mt-1">
+                                <input type="radio" v-model="settings.salesCalcMethod" value="average" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-700 font-medium">常规均值法 <span class="text-xs font-normal text-slate-400 block">(近30天总销量 ÷ 30)</span></span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" v-model="settings.salesCalcMethod" value="weighted" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-slate-700 font-medium">动态加权法 <span class="text-xs font-normal text-orange-500 block">(自定义老品与新品天数占比)</span></span>
+                            </label>
+                            
+                            <div v-if="settings.salesCalcMethod === 'weighted'" class="flex flex-col gap-2 mt-2 pt-3 border-t border-indigo-100">
+                                <div class="grid grid-cols-4 gap-2 items-center">
+                                    <span class="text-[10px] font-bold text-slate-500 text-center">老品</span>
+                                    <div><label class="text-[9px] text-indigo-500">7天(%)</label><input type="number" v-model.number="settings.weight7" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
+                                    <div><label class="text-[9px] text-indigo-500">14天(%)</label><input type="number" v-model.number="settings.weight14" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
+                                    <div><label class="text-[9px] text-indigo-500">30天(%)</label><input type="number" v-model.number="settings.weight30" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
+                                </div>
+                                <div class="grid grid-cols-4 gap-2 items-center pt-2 border-t border-indigo-50 border-dashed">
+                                    <span class="text-[10px] font-bold text-green-600 text-center bg-green-100 rounded-sm leading-none py-1 mx-1">新品</span>
+                                    <div><label class="text-[9px] text-green-600">7天(%)</label><input type="number" v-model.number="settings.weightNew7" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
+                                    <div><label class="text-[9px] text-green-600">14天(%)</label><input type="number" v-model.number="settings.weightNew14" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
+                                    <div><label class="text-[9px] text-green-600">30天(%)</label><input type="number" v-model.number="settings.weightNew30" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">物流与缓冲时间 (天)</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-xs text-slate-600">迪拜空运</label><input type="number" v-model.number="settings.uaeAirLeadTime" class="w-full mt-1 bg-white border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">沙特空运</label><input type="number" v-model.number="settings.ksaAirLeadTime" class="w-full mt-1 bg-white border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">迪拜海运</label><input type="number" v-model.number="settings.uaeSeaLeadTime" class="w-full mt-1 bg-white border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">沙特海运</label><input type="number" v-model.number="settings.ksaSeaLeadTime" class="w-full mt-1 bg-white border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div class="col-span-2"><label class="text-xs text-slate-600 font-bold text-indigo-600">安全库存缓冲</label><input type="number" v-model.number="settings.safeStock" class="w-full mt-1 bg-indigo-50 border border-indigo-200 rounded p-1.5 text-sm text-center text-indigo-700"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-amber-50/60 rounded-xl border border-amber-100">
+                        <h3 class="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2 flex justify-between items-center">
+                            <span>💰 中东干线运费单价配置 (元/kg)</span>
+                        </h3>
+                        <p class="text-[10px] text-slate-500 mb-3 leading-relaxed">
+                            计费规则：<strong>空运按商品实重(kg)</strong>计算，<strong>海运按商品体积重(kg)</strong>计算。<br>用于海运即将断货产品转空运紧急补货的成本增额精准测算。
+                        </p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
+                                    <span>✈️</span> 迪拜空运 (元/kg)
+                                </label>
+                                <input type="number" step="0.01" v-model.number="settings.uaeAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
+                                    <span>✈️</span> 沙特空运 (元/kg)
+                                </label>
+                                <input type="number" step="0.01" v-model.number="settings.ksaAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
+                                    <span>🚢</span> 迪拜海运 (元/kg)
+                                </label>
+                                <input type="number" step="0.01" v-model.number="settings.uaeSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
+                                    <span>🚢</span> 沙特海运 (元/kg)
+                                </label>
+                                <input type="number" step="0.01" v-model.number="settings.ksaSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                            </div>
+                        </div>
+                    </div>
+
+
+<div class="p-4 bg-indigo-50/70 rounded-xl border border-indigo-100">
+    <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-3 flex justify-between items-center">
+        <span>✈️🚢 空海结合配比比例</span>
+        <span class="text-sm font-black text-indigo-600">空 {{ settings.airSeaRatio }}% : 海 {{ 100 - settings.airSeaRatio }}%</span>
+    </h3>
+    <div class="flex items-center gap-3">
+        <span class="text-xs font-medium text-slate-500">✈️ 空运</span>
+        <input type="range" v-model.number="settings.airSeaRatio" min="0" max="100" class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+        <span class="text-xs font-medium text-slate-500">🚢 海运</span>
+    </div>
+    <p class="text-[10px] text-slate-400 mt-2 leading-tight">注：选定空海结合的SKU在下载计划表时，将按此比例分割为“空运”与“海运”独立两行。解耦计算自动取整。</p>
+</div>
+
+<div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">补货基数配置 (天)</h3>
+    <div class="grid grid-cols-3 gap-2">
+        <div><label class="text-xs text-slate-600">爆款</label><input type="number" v-model.number="settings.baoRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+        <div><label class="text-xs text-slate-600">旺款</label><input type="number" v-model.number="settings.wangRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+        <div><label class="text-xs text-slate-600">平款</label><input type="number" v-model.number="settings.normalRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+    </div>
+</div>
+
+<div class="p-4 bg-slate-50 rounded-xl border border-slate-100 mt-4">
+    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">自动识别阈值</h3>
+    <div class="space-y-3">
+        <div class="flex justify-between items-center">
+            <label class="text-xs text-slate-600">爆款最低销量 (个)</label>
+            <input type="number" v-model.number="settings.baoThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-red-500">
+        </div>
+        <div class="flex justify-between items-center">
+            <label class="text-xs text-slate-600">旺款最低销量 (个)</label>
+            <input type="number" v-model.number="settings.wangThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-orange-500">
+        </div>
+
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-slate-600">迪拜空/海分界重量 (kg)</label>
+                                <input type="number" step="0.01" v-model.number="settings.uaeWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-slate-600">沙特空/海分界重量 (kg)</label>
+                                <input type="number" step="0.01" v-model.number="settings.ksaWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-slate-600 font-medium text-indigo-900">迪拜体积重警戒线 (kg)</label>
+                                <input type="number" step="0.01" v-model.number="settings.uaeVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <label class="text-xs text-slate-600 font-medium text-indigo-900">沙特体积重警戒线 (kg)</label>
+                                <input type="number" step="0.01" v-model.number="settings.ksaVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
+                            </div>
+                            <div class="flex justify-between items-center border-t border-slate-200 pt-3">
+                                <div>
+                                    <label class="text-xs font-bold text-red-600 block">FBA 亏本预警线 (元)</label>
+                                    <span class="text-[10px] text-slate-400">售价 - FBA成本 &lt; 此值时提示</span>
+                                </div>
+                                <input type="number" step="0.5" v-model.number="settings.fbaLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="10">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <label class="text-xs font-bold text-red-600 block">SF 亏本预警线 (元)</label>
+                                    <span class="text-[10px] text-slate-400">售价 - SF成本 &lt; 此值时提示</span>
+                                </div>
+                                <input type="number" step="0.5" v-model.number="settings.sfLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="12">
+                            </div>
+                            <div class="flex justify-between items-center border-t border-slate-200 pt-3">
+                                <label class="text-xs font-bold text-orange-600">预警：单日销量占比阈值 (%)</label>
+                                <input type="number" v-model.number="settings.volatilityThreshold" class="w-20 bg-orange-50 border border-orange-200 text-orange-700 rounded p-1.5 text-sm text-center">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between mt-2">
+                        <h3 class="text-xs font-bold text-slate-700">显示「沙特(跨国)」区域数据</h3>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" v-model="settings.showKsaCrossBorder" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    
+                    <!-- 在线版本检测设置卡片 (v4.2.1) -->
+                    <div class="p-4 bg-blue-50/60 rounded-xl border border-blue-100 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                                <span>🔄 系统版本与在线更新</span>
+                                <span class="text-[10px] bg-blue-200 text-blue-800 px-1.5 py-0.2 rounded font-mono">v{{ CURRENT_VERSION }}</span>
+                            </h3>
+                            <button @click="checkVersionUpdate(true)" :disabled="isCheckingUpdate" class="text-[11px] bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1">
+                                <svg v-if="isCheckingUpdate" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                <span>{{ isCheckingUpdate ? '检测中...' : '检查更新' }}</span>
+                            </button>
+                        </div>
+                        <div v-if="checkUpdateMsg" class="text-[11px] font-medium text-blue-700 bg-white/80 p-2 rounded border border-blue-200">
+                            {{ checkUpdateMsg }}
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">GitHub 仓库地址 (Owner/Repo)：</label>
+                            <input type="text" v-model="settings.githubRepo" class="w-full text-xs font-mono px-2 py-1.5 rounded border border-slate-200 bg-white focus:border-blue-400 outline-none" placeholder="例如: disky1998/replenish-system">
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-slate-400 text-center pb-2">修改参数后，表格将立即自动重新计算并缓存。</div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- SOP 说明面板 -->
+        <transition name="fade">
+            <div v-show="showSOP" v-drag class="fixed top-1/2 left-1/2 w-[420px] bg-slate-900 text-slate-300 shadow-2xl z-50 rounded-2xl border border-slate-700 overflow-hidden flex flex-col max-h-[90vh] -translate-x-1/2 -translate-y-1/2">
+                <div class="drag-handle bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center select-none active:bg-slate-700 transition-colors">
+                    <h2 class="text-lg font-bold text-white pointer-events-none">操作流程 SOP (可拖拽)</h2>
+                    <button @click="showSOP = false" class="text-slate-400 hover:text-white transition-colors p-1 rounded-md hover:bg-slate-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto space-y-4 text-sm leading-relaxed">
+                    <p><strong class="text-blue-400">第一步：</strong> 首次使用，先导入《马帮库存 SKU 表》建立图片、分类、重量与体积重底库（永久保存）。</p>
+                    <p><strong class="text-blue-400">第二步：</strong> 日常上传《销量统计表》，系统自动根据迪拜/沙特聚合多店铺同 ASIN 数据，并踢出0销量。</p>
+                    <p><strong class="text-blue-400">第三步：</strong> 如果有已采未发的货，点击【本地在途导入】，系统会自动将“待签收”的数据叠加到在途中。</p>
+                    <p><strong class="text-blue-400">第四步：核心算法：</strong>
+                        <br><span class="text-emerald-400 font-mono text-xs mt-1 block bg-slate-800 p-2 rounded">常规 = 向上取整[(触发水位 - 现有天数 + 补货基数) × 日均]</span>
+                        <br><span class="text-orange-400 font-mono text-xs mt-1 block bg-slate-800 p-2 rounded">断货优化 = 根据设置中的公式精准阻断冗余库存补足</span>
+                    </p>
+                    <p><strong class="text-blue-400">第五步：海运断货预警：</strong> 若海运商品在到货前将经历断货，系统将自动高亮【⚡ 建议改空运】并浮现精确运费增加额，支持一键快捷切为空运。</p>
+                    <p><strong class="text-blue-400">第六步：</strong> 运营人员填写【实际补货量】，点击【下载补货计划】交接。</p>
+                </div>
+            </div>
+        </transition>
+        
+        <div v-if="showSettings || showSOP" @click="showSettings = false; showSOP = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity"></div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch, onMounted } = Vue;
+
+        
+        const CURRENT_VERSION = '4.2.1';
+        const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
+
+        const compareVersions = (v1, v2) => {
+            if (!v1 || !v2) return 0;
+            const clean1 = String(v1).replace(/^v/i, '').split('.').map(n => parseInt(n) || 0);
+            const clean2 = String(v2).replace(/^v/i, '').split('.').map(n => parseInt(n) || 0);
+            const len = Math.max(clean1.length, clean2.length);
+            for (let i = 0; i < len; i++) {
+                const num1 = clean1[i] || 0;
+                const num2 = clean2[i] || 0;
+                if (num1 > num2) return 1;
+                if (num1 < num2) return -1;
+            }
+            return 0;
+        };
+
+        const ALLOWED_CATEGORIES = ['开学季', '情人节', '跟卖', '复活节', '夏', '母亲节', '儿童节', '父亲节', '毕业季', '排灯节', '万圣节', '感恩节', '圣诞UAE', '冬'];
+
+        const getSparklinePointsRaw = (data) => {
+            if (!data || data.length === 0) return [];
+            const max = Math.max(...data.map(d => d.val), 1);
+            const width = 100;
+            const height = 30;
+            const step = width / Math.max(data.length - 1, 1);
+            return data.map((d, i) => {
+                const x = i * step;
+                const y = height - (d.val / max) * (height - 4) - 2; 
+                return {
+                    CURRENT_VERSION,
+                    updateInfo, showUpdateModal, isCheckingUpdate, checkUpdateMsg, isDownloadingUpdate,
+                    checkVersionUpdate, downloadLatestHtml, x, y, step, val: d.val, label: `${d.date}: ${d.val}个` };
+            });
+        };
+        const getSparklinePathRaw = (pts) => {
+            if (!pts || pts.length === 0) return '';
+            return `M ${pts.map(p => `${p.x},${p.y}`).join(' L ')}`;
+        };
+        const getSparklineFillRaw = (pts) => {
+            if (!pts || pts.length === 0) return '';
+            const path = getSparklinePathRaw(pts);
+            return `${path} L 100,30 L 0,30 Z`;
+        };
+
+        const computeNewTrendData = (sales7, sales14, monthlySales) => {
+            const q1 = Math.max(0, sales7 || 0);
+            const q2 = Math.max(0, (sales14 || 0) - q1);
+            const q3 = Math.max(0, (monthlySales || 0) - (sales14 || 0));
+
+            const avg1 = q1 / 7;
+            const avg2 = q2 / 7;
+            const avg3 = q3 / 16;
+
+            const maxVal = Math.max(avg1, avg2, avg3, 0.05);
+            const h1 = Math.max(2, Math.round((avg1 / maxVal) * 22));
+            const h2 = Math.max(2, Math.round((avg2 / maxVal) * 22));
+            const h3 = Math.max(2, Math.round((avg3 / maxVal) * 22));
+
+            const y1 = 28 - h1;
+            const y2 = 28 - h2;
+            const y3 = 28 - h3;
+            // 近7天在左 (x=16), 8~14天在中 (x=50), 15~30天在右 (x=84)
+            const linePath = `M 16,${y1} L 50,${y2} L 84,${y3}`;
+
+            let colorType = 'stable';
+            let trendText = '➡️ 平稳走势';
+            let c1 = '#3b82f6', c2 = '#93c5fd', c3 = '#cbd5e1', strokeColor = '#2563eb';
+
+            if (avg1 >= avg3 * 1.25 && avg1 >= 0.8) {
+                colorType = 'rising';
+                const boostPct = avg3 > 0 ? Math.round(((avg1 - avg3) / avg3) * 100) : 100;
+                trendText = `🚀 近期爆发增长 (+${boostPct}%)`;
+                c1 = '#10b981'; // 翠绿
+                c2 = '#6ee7b7';
+                c3 = '#cbd5e1';
+                strokeColor = '#059669';
+            } else if (avg1 <= avg3 * 0.75 && avg3 >= 0.8) {
+                colorType = 'falling';
+                const dropPct = avg3 > 0 ? Math.round(((avg3 - avg1) / avg3) * 100) : 50;
+                trendText = `📉 近期持续降温 (-${dropPct}%)`;
+                c1 = '#f59e0b'; // 琥珀橙
+                c2 = '#fcd34d';
+                c3 = '#cbd5e1';
+                strokeColor = '#d97706';
+            }
+
+            const tooltip = `【时序阶段日均走势】\n• 近 7 天: ${avg1.toFixed(1)} 件/天 (共 ${q1} 件)\n• 8~14天前: ${avg2.toFixed(1)} 件/天 (共 ${q2} 件)\n• 15~30天前: ${avg3.toFixed(1)} 件/天 (共 ${q3} 件)\n-----------------------\n走势: ${trendText}`;
+
+            return {
+                avg1, avg2, avg3,
+                q1, q2, q3,
+                h1, h2, h3,
+                y1, y2, y3,
+                linePath,
+                colorType,
+                trendText,
+                c1, c2, c3, strokeColor,
+                tooltip
+            };
+        };
+
+        const app = createApp({
+            setup() {
+                const showSettings = ref(false);
+                const showSOP = ref(false);
+                const isDragOver = ref(false); 
+                const isConfigCollapsed = ref(false);
+                
+                const currentPage = ref(1);
+                const pageSize = ref(100);
+
+                const hideSafe = ref(false); 
+                const filterCountry = ref('');
+                const filterLogistics = ref('');
+                const filterItemType = ref('');
+                const filterStatus = ref('');
+                const filterNewProduct = ref('');
+
+                // 新增搜素状态
+                const searchType = ref('sku');
+                const searchQuery = ref('');
+
+                const sortField = ref('default'); 
+                const sortOrder = ref('desc');
+
+                const batchLogistics = ref('');
+                const batchType = ref('');
+
+                const previewImage = ref(null);
+                const previewVisible = ref(false);
+                const previewPos = ref({ top: '0px', left: '0px' });
+                let hidePreviewTimeout = null;
+
+                // 全局悬浮改空运成本测算卡片状态
+                const airTooltipItem = ref(null);
+                const airTooltipVisible = ref(false);
+                const airTooltipPos = ref({ top: '0px', left: '0px' });
+                let hideAirTooltipTimeout = null;
+
+                const showAirTooltip = (e, item) => {
+                    if (!item) return;
+                    clearTimeout(hideAirTooltipTimeout);
+                    airTooltipItem.value = item;
+                    
+                    const target = e.currentTarget || e.target;
+                    const rect = target.getBoundingClientRect();
+                    const tooltipWidth = 310;
+                    
+                    // 水平方向：居中对齐按钮，且保证左右不溢出视口
+                    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    if (left < 10) left = 10;
+                    if (left + tooltipWidth > window.innerWidth - 10) {
+                        left = window.innerWidth - tooltipWidth - 10;
+                    }
+                    
+                    // 垂直方向：智能避让顶部表头与视口上下边界，杜绝任何遮挡
+                    let top = 0;
+                    const estimatedHeight = item.urgentAirCostDiff && item.urgentAirCostDiff.isMissingData ? 300 : 270;
+                    
+                    if (rect.top < estimatedHeight + 80) {
+                        // 靠近表格顶部（第一行/第二行），向下弹出，完全不被固定表头遮挡
+                        top = rect.bottom + 8;
+                    } else {
+                        // 正常向上弹出
+                        top = rect.top - estimatedHeight - 8;
+                    }
+                    
+                    // 防溢出视口底部
+                    if (top + estimatedHeight > window.innerHeight - 10) {
+                        top = window.innerHeight - estimatedHeight - 10;
+                    }
+                    if (top < 10) top = 10;
+                    
+                    airTooltipPos.value = { top: `${top}px`, left: `${left}px` };
+                    airTooltipVisible.value = true;
+                };
+
+                const hideAirTooltip = () => {
+                    airTooltipVisible.value = false;
+                    hideAirTooltipTimeout = setTimeout(() => {
+                        airTooltipItem.value = null;
+                    }, 150);
+                };
+
+                // 全局单例高清趋势卡片状态 (零卡顿 120 FPS 渲染架构)
+                const trendTooltipItem = ref(null);
+                const trendTooltipVisible = ref(false);
+                const trendTooltipPos = ref({ top: '0px', left: '0px' });
+                const trendHoverPoint = ref(null);
+                let hideTrendTooltipTimeout = null;
+
+                const cancelHideTrendPreview = () => {
+                    if (hideTrendTooltipTimeout) {
+                        clearTimeout(hideTrendTooltipTimeout);
+                        hideTrendTooltipTimeout = null;
+                    }
+                };
+
+                const showTrendPreview = (e, item) => {
+                    if (!item) return;
+                    cancelHideTrendPreview();
+                    trendTooltipItem.value = item;
+
+                    // 默认显示最近一天的具体数据
+                    if (item.salesTrend && item.salesTrend.length > 0) {
+                        const lastIdx = item.salesTrend.length - 1;
+                        trendHoverPoint.value = {
+                            date: item.salesTrend[lastIdx].date,
+                            val: item.salesTrend[lastIdx].val,
+                            index: lastIdx
+                        };
+                    } else {
+                        trendHoverPoint.value = null;
+                    }
+
+                    const target = e.currentTarget || e.target;
+                    const rect = target.getBoundingClientRect();
+                    const tooltipWidth = 320;
+                    const tooltipHeight = 180;
+
+                    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+                    if (left < 10) left = 10;
+                    if (left + tooltipWidth > window.innerWidth - 10) {
+                        left = window.innerWidth - tooltipWidth - 10;
+                    }
+
+                    let top = 0;
+                    if (rect.top < tooltipHeight + 90) {
+                        top = rect.bottom + 6; // 靠近顶部向下弹出
+                    } else {
+                        top = rect.top - tooltipHeight - 6; // 正常向上弹出
+                    }
+
+                    if (top + tooltipHeight > window.innerHeight - 10) {
+                        top = window.innerHeight - tooltipHeight - 10;
+                    }
+                    if (top < 10) top = 10;
+
+                    trendTooltipPos.value = { top: `${top}px`, left: `${left}px` };
+                    trendTooltipVisible.value = true;
+                };
+
+                const hideTrendPreview = () => {
+                    cancelHideTrendPreview();
+                    hideTrendTooltipTimeout = setTimeout(() => {
+                        trendTooltipVisible.value = false;
+                        trendTooltipItem.value = null;
+                        trendHoverPoint.value = null;
+                    }, 250);
+                };
+
+                // 用户在表格单元格上直接滑动时，实时联动更新浮窗内的日期和销量
+                const handleCellMouseMove = (e, item) => {
+                    if (!item || !item.salesTrend || item.salesTrend.length === 0) return;
+                    if (!trendTooltipVisible.value || trendTooltipItem.value !== item) {
+                        showTrendPreview(e, item);
+                    }
+                    cancelHideTrendPreview();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const pct = Math.max(0, Math.min(1, x / rect.width));
+                    const index = Math.min(Math.round(pct * (item.salesTrend.length - 1)), item.salesTrend.length - 1);
+                    const point = item.salesTrend[index];
+                    if (point) {
+                        trendHoverPoint.value = {
+                            date: point.date,
+                            val: point.val,
+                            index: index
+                        };
+                    }
+                };
+
+                // 用户在浮窗大图上滑动时，同样精准联动
+                const handleSparklineMouseMove = (e, item) => {
+                    if (!item || !item.salesTrend || item.salesTrend.length === 0) return;
+                    cancelHideTrendPreview();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const pct = Math.max(0, Math.min(1, x / rect.width));
+                    const index = Math.min(Math.round(pct * (item.salesTrend.length - 1)), item.salesTrend.length - 1);
+                    const point = item.salesTrend[index];
+                    if (point) {
+                        trendHoverPoint.value = {
+                            date: point.date,
+                            val: point.val,
+                            index: index
+                        };
+                    }
+                };
+
+                
+                // 版本检测与在线更新状态 (v4.2.1)
+                const updateInfo = ref({
+                    hasUpdate: false,
+                    latestVersion: '',
+                    releaseDate: '',
+                    changelog: [],
+                    downloadUrl: '',
+                    githubUrl: ''
+                });
+                const showUpdateModal = ref(false);
+                const isCheckingUpdate = ref(false);
+                const checkUpdateMsg = ref('');
+                const isDownloadingUpdate = ref(false);
+
+                const checkVersionUpdate = async (isManual = false) => {
+                    if (isCheckingUpdate.value) return;
+                    isCheckingUpdate.value = true;
+                    checkUpdateMsg.value = '正在检测最新版本...';
+
+                    const repo = (settings.value && settings.value.githubRepo ? settings.value.githubRepo.trim() : '') || DEFAULT_GITHUB_REPO;
+                    // 双通道容灾：1. jsDelivr 国内加速 CDN 2. GitHub Raw 原源
+                    const sources = [
+                        `https://fastly.jsdelivr.net/gh/${repo}@main/version.json?_t=${Date.now()}`,
+                        `https://raw.githubusercontent.com/${repo}/main/version.json?_t=${Date.now()}`
+                    ];
+
+                    let fetchedData = null;
+                    for (const url of sources) {
+                        try {
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 4000);
+                            const res = await fetch(url, { signal: controller.signal });
+                            clearTimeout(timeoutId);
+                            if (res.ok) {
+                                fetchedData = await res.json();
+                                if (fetchedData && fetchedData.version) break;
+                            }
+                        } catch (e) {}
+                    }
+
+                    isCheckingUpdate.value = false;
+
+                    if (!fetchedData || !fetchedData.version) {
+                        if (isManual) {
+                            checkUpdateMsg.value = '❌ 检测失败，请检查网络或 GitHub 仓库配置';
+                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
+                        }
+                        return;
+                    }
+
+                    const isNew = compareVersions(fetchedData.version, CURRENT_VERSION) > 0;
+                    updateInfo.value = {
+                        hasUpdate: isNew,
+                        latestVersion: fetchedData.version,
+                        releaseDate: fetchedData.releaseDate || '',
+                        changelog: fetchedData.changelog || [],
+                        downloadUrl: fetchedData.jsdelivrDownloadUrl || fetchedData.downloadUrl || '',
+                        githubUrl: fetchedData.githubUrl || `https://github.com/${repo}`
+                    };
+
+                    if (isNew) {
+                        showUpdateModal.value = true;
+                        checkUpdateMsg.value = `🔥 发现新版本 v${fetchedData.version}`;
+                    } else {
+                        if (isManual) {
+                            checkUpdateMsg.value = `🎉 当前已是最新版本 (v${CURRENT_VERSION})`;
+                            setTimeout(() => { checkUpdateMsg.value = ''; }, 4000);
+                        }
+                    }
+                };
+
+                const downloadLatestHtml = async () => {
+                    if (!updateInfo.value.downloadUrl) {
+                        window.open(updateInfo.value.githubUrl || 'https://github.com', '_blank');
+                        return;
+                    }
+                    try {
+                        isDownloadingUpdate.value = true;
+                        const targetUrl = updateInfo.value.downloadUrl + (updateInfo.value.downloadUrl.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+                        const res = await fetch(targetUrl);
+                        if (!res.ok) throw new Error('下载请求失败: ' + res.status);
+                        const text = await res.text();
+                        const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = `补货辅助系统v${updateInfo.value.latestVersion}.html`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                        isDownloadingUpdate.value = false;
+                        alert(`✅ 新版本【补货辅助系统v${updateInfo.value.latestVersion}.html】已成功下载至您的电脑！`);
+                    } catch (err) {
+                        isDownloadingUpdate.value = false;
+                        console.error(err);
+                        alert('自动下载遇到网络限制，已为您打开 GitHub 页面进行下载！');
+                        window.open(updateInfo.value.githubUrl || updateInfo.value.downloadUrl, '_blank');
+                    }
+                };
+
+                const settings = ref({
+                    githubRepo: DEFAULT_GITHUB_REPO,
+                    showKsaCrossBorder: false, 
+                    oosOptimizationEnabled: false,
+                    oosCalcMethod: 1, 
+                    salesCalcMethod: 'average',
+                    weight7: 20, 
+                    weight14: 30,
+                    weight30: 50,
+                    newProductThresholdMonths: 6,
+                    weightNew7: 70,
+                    weightNew14: 20,
+                    weightNew30: 10,
+                    uaeAirLeadTime: 15,
+                    ksaAirLeadTime: 15,
+                    uaeSeaLeadTime: 35,
+                    ksaSeaLeadTime: 35,
+                    safeStock: 10,
+                    baoRestockDays: 15,    // 爆款补货天数
+                    wangRestockDays: 15,   // 旺款补货天数
+                    normalRestockDays: 30, // 平款补货天数
+                    baoThreshold: 15,      // 爆款分界销量
+                    wangThreshold: 8,      // 旺款分界销量
+                    uaeWeightThreshold: 0.25,
+                    ksaWeightThreshold: 0.20,
+                    uaeVolumeWeightThreshold: 0.8,
+                    ksaVolumeWeightThreshold: 0.8,
+                    volatilityThreshold: 30,
+                    airSeaRatio: 50,
+                    // 亏本预警利差阈值 (元)
+                    fbaLossThreshold: 10,
+                    sfLossThreshold: 12,
+                    // 中东干线运费单价配置 (元/kg)
+                    uaeAirFreightRate: 51.1,
+                    ksaAirFreightRate: 72.45,
+                    uaeSeaFreightRate: 15.0,
+                    ksaSeaFreightRate: 20.0
+                });
+
+                const skuBaseMap = ref({}); 
+                const processedData = ref([]); 
+                const hasSkuData = computed(() => Object.keys(skuBaseMap.value).length > 0);
+
+                const getStatusClass = (status) => {
+                    if (status === '正常销售') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                    if (status === '商品清仓') return 'bg-amber-50 text-amber-600 border-amber-200';
+                    return 'bg-slate-50 text-slate-500 border-slate-200';
+                };
+
+                const showPreview = (e, img) => {
+                    if (!img) return;
+                    clearTimeout(hidePreviewTimeout);
+                    previewImage.value = img;
+                    
+                    const rect = e.target.getBoundingClientRect();
+                    let left = rect.right + 15; 
+                    let top = rect.top - 140 + (rect.height / 2); 
+                    
+                    if (left + 300 > window.innerWidth) left = rect.left - 300; 
+                    if (top < 10) top = 10;
+                    if (top + 280 > window.innerHeight) top = window.innerHeight - 290;
+
+                    previewPos.value = { top: top + 'px', left: left + 'px' };
+                    previewVisible.value = true;
+                };
+
+                const hidePreview = () => {
+                    previewVisible.value = false;
+                    hidePreviewTimeout = setTimeout(() => {
+                        previewImage.value = null;
+                    }, 200);
+                };
+
+// --- 替换整个 onMounted 代码块 ---
+                onMounted(async () => {
+                    try {
+                        // 1. 初始化 IndexedDB 数据库
+                        localforage.config({
+                            name: 'GMRestockSystem',
+                            storeName: 'gm_data_store_v1' // 专属存储空间
+                        });
+
+                        // 2. ⚡【无缝迁移旧数据】：把原本卡在 localStorage 里的数据搬家
+                        if (localStorage.getItem('replenish_skuBaseMap')) {
+                            console.log("检测到旧版 localStorage 数据，正在自动迁移至 IndexedDB...");
+                            await localforage.setItem('replenish_skuBaseMap', JSON.parse(localStorage.getItem('replenish_skuBaseMap')));
+                            
+                            if (localStorage.getItem('replenish_processedData')) {
+                                await localforage.setItem('replenish_processedData', JSON.parse(localStorage.getItem('replenish_processedData')));
+                            }
+                            if (localStorage.getItem('replenish_settings')) {
+                                await localforage.setItem('replenish_settings', JSON.parse(localStorage.getItem('replenish_settings')));
+                            }
+                            
+                            // 搬家完毕，彻底摧毁旧的 5MB 小黑屋
+                            localStorage.removeItem('replenish_skuBaseMap');
+                            localStorage.removeItem('replenish_processedData');
+                            localStorage.removeItem('replenish_settings');
+                            console.log("数据迁移完成！彻底告别 5MB 限制！");
+                        }
+
+                        // 3. 从 IndexedDB 异步读取数据
+                        const savedSkuData = await localforage.getItem('replenish_skuBaseMap');
+                        if (savedSkuData) skuBaseMap.value = savedSkuData;
+                        
+                        const savedData = await localforage.getItem('replenish_processedData');
+                        if (savedData) {
+                            processedData.value = savedData.map(item => {
+                                if (!item.sparklinePoints && item.salesTrend) {
+                                    item.sparklinePoints = getSparklinePointsRaw(item.salesTrend);
+                                    item.sparklinePath = getSparklinePathRaw(item.sparklinePoints);
+                                    item.sparklineFill = getSparklineFillRaw(item.sparklinePoints);
+                                }
+                                if (item.isNewVersion && (!item.newTrendData || !item.newTrendData.linePath)) {
+                                    item.newTrendData = computeNewTrendData(item.totalSales7 || 0, item.totalSales14 || 0, item.monthlySales || 0);
+                                }
+                                return createReactiveItem(item);
+                            });
+                        }
+                        
+                        const savedSettings = await localforage.getItem('replenish_settings');
+                        if (savedSettings) settings.value = { ...settings.value, ...savedSettings };
+                        
+                        // 启动时静默检查更新 (1.2 秒延时无阻塞)
+                        setTimeout(() => {
+                            checkVersionUpdate(false);
+                        }, 1200);
+                        
+                    } catch (e) {
+                        console.error('读取 IndexedDB 缓存失败', e);
+                        alert("底层数据库读取失败，请重试！");
+                    }
+                });
+                // ---------------------------------
+
+// --- 替换原有的三个 watch 代码块 ---
+
+                // 1. SKU 库保存（延迟 800ms 存入 IndexedDB）
+                let skuSaveTimer = null;
+                watch(skuBaseMap, () => {
+                    if (skuSaveTimer) clearTimeout(skuSaveTimer);
+                    skuSaveTimer = setTimeout(() => {
+                        localforage.setItem('replenish_skuBaseMap', JSON.parse(JSON.stringify(skuBaseMap.value))).catch(err => console.error(err));
+                    }, 800); 
+                }, { deep: true });
+
+                // 2. 销量表保存（延迟 500ms，附加数据瘦身机制，丢弃画图垃圾数据）
+                let dataSaveTimer = null;
+                watch(processedData, () => {
+                    if (dataSaveTimer) clearTimeout(dataSaveTimer);
+                    dataSaveTimer = setTimeout(() => {
+                        try {
+                            const slimData = processedData.value.map(item => {
+                                const { sparklinePoints, sparklinePath, sparklineFill, ...restToSave } = item;
+                                return restToSave;
+                            });
+                            localforage.setItem('replenish_processedData', JSON.parse(JSON.stringify(slimData))).catch(err => {
+                                console.error('IndexedDB 保存销量数据失败:', err);
+                            });
+                        } catch (error) {
+                            console.error('处理保存数据时遇到未知错误:', error);
+                        }
+                    }, 500);
+                }, { deep: true });
+
+                // 3. 系统参数设置保存（延迟 300ms 存入 IndexedDB）
+                let settingsSaveTimer = null;
+                watch(settings, (val) => {
+                    if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+                    settingsSaveTimer = setTimeout(() => {
+                        localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(val))).catch(err => console.error(err));
+                    }, 300);
+                }, { deep: true });
+                // ---------------------------------
+
+
+                watch([filterCountry, filterLogistics, filterItemType, filterStatus, filterNewProduct, sortField, sortOrder, hideSafe, searchQuery, searchType], () => {
+                    currentPage.value = 1;
+                });
+
+// --- 替换这两个清空函数 ---
+                const resetSalesData = () => {
+                    if (confirm("确定要清空当前的销量数据吗？\n（马帮 SKU 基础库不会被清空）")) {
+                        processedData.value = [];
+                        sortField.value = 'default';
+                        localforage.removeItem('replenish_processedData');
+                    }
+                };
+
+                const clearSkuBaseData = () => {
+                    if (confirm("🚨 警告：您确定要清空底层 SKU 数据库吗？\n清空后需要重新上传马帮 SKU 表！")) {
+                        skuBaseMap.value = {};
+                        localforage.removeItem('replenish_skuBaseMap');
+                        processedData.value = []; 
+                        localforage.removeItem('replenish_processedData');
+                        showSettings.value = false;
+                    }
+                };
+                // -----------------------
+
+                const removeRow = (itemToRemove) => {
+                    if(confirm(`确定要移除 SKU: ${itemToRemove.sku} 吗？\n移除后将不再参与计算和导出。`)) {
+                        processedData.value = processedData.value.filter(item => item.id !== itemToRemove.id);
+                    }
+                };
+
+                const processFile = (file, isSkuMode) => {
+                    const isCSV = file.name.toLowerCase().endsWith('.csv');
+                    const reader = new FileReader();
+                    
+                    reader.onload = (e) => {
+                        try {
+                            const buffer = e.target.result;
+                            if (isCSV) {
+                                let text = new TextDecoder('utf-8').decode(buffer);
+                                if (text.includes('\uFFFD')) {
+                                    text = new TextDecoder('gbk').decode(buffer);
+                                }
+                                Papa.parse(text, {
+                                    header: true,
+                                    skipEmptyLines: true,
+                                    complete: function(results) {
+                                        try {
+                                            if (isSkuMode) processSkuBaseData(results.data);
+                                            else processSalesData(results.data);
+                                        } catch (err) {
+                                            alert("处理数据时出错：" + err.message);
+                                        }
+                                    }
+                                });
+                            } else {
+                                const data = new Uint8Array(buffer);
+                                const workbook = XLSX.read(data, {type: 'array'});
+                                const firstSheetName = workbook.SheetNames[0];
+                                const worksheet = workbook.Sheets[firstSheetName];
+                                const json = XLSX.utils.sheet_to_json(worksheet, {defval: "", raw: false});
+                                if (isSkuMode) processSkuBaseData(json);
+                                else processSalesData(json);
+                            }
+                        } catch (error) {
+                            alert("解析文件失败！\n错误信息：" + error.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+
+                const handleSkuFileUpload = (e) => {
+                    if (e.target.files[0]) processFile(e.target.files[0], true);
+                    e.target.value = '';
+                };
+                const handleSkuFileDrop = (e) => {
+                    isDragOver.value = false;
+                    if (e.dataTransfer?.files[0]) processFile(e.dataTransfer.files[0], true);
+                };
+                const handleSalesFileUpload = (e) => {
+                    if (e.target.files[0]) processFile(e.target.files[0], false);
+                    e.target.value = '';
+                };
+                const handleSalesFileDrop = (e) => {
+                    isDragOver.value = false;
+                    if (e.dataTransfer?.files[0]) processFile(e.dataTransfer.files[0], false);
+                };
+
+                // --- 新增：本地在途文件解析 ---
+                const handleInTransitFileUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const isCSV = file.name.toLowerCase().endsWith('.csv');
+                    const reader = new FileReader();
+                    
+                    reader.onload = (e) => {
+                        try {
+                            const buffer = e.target.result;
+                            if (isCSV) {
+                                let text = new TextDecoder('utf-8').decode(buffer);
+                                if (text.includes('\uFFFD')) {
+                                    text = new TextDecoder('gbk').decode(buffer);
+                                }
+                                Papa.parse(text, {
+                                    header: true,
+                                    skipEmptyLines: true,
+                                    complete: function(results) {
+                                        try {
+                                            processInTransitData(results.data);
+                                        } catch (err) {
+                                            alert("处理在途数据时出错：" + err.message);
+                                        }
+                                    }
+                                });
+                            } else {
+                                const data = new Uint8Array(buffer);
+                                const workbook = XLSX.read(data, {type: 'array'});
+                                const firstSheetName = workbook.SheetNames[0];
+                                const worksheet = workbook.Sheets[firstSheetName];
+                                const json = XLSX.utils.sheet_to_json(worksheet, {defval: "", raw: false});
+                                processInTransitData(json);
+                            }
+                        } catch (error) {
+                            alert("解析文件失败！\n错误信息：" + error.message);
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                    e.target.value = ''; // 清空 value 以便重复上传
+                };
+
+const processInTransitData = (data) => {
+                    let matchCount = 0;
+                    let addedQty = 0;
+
+                    data.forEach(rawRow => {
+                        const row = {};
+                        for (let k in rawRow) {
+                            // 去空格、去BOM、转大写，确保列名匹配不受干扰
+                            const cleanKey = k ? String(k).replace(/[\s\uFEFF\xa0"']/g, '').toUpperCase() : '';
+                            row[cleanKey] = rawRow[k];
+                        }
+                        
+                        // 定位核心列
+                        let statusKey = Object.keys(row).find(k => k.includes('状态') || k.includes('STATUS'));
+                        let skuKey = Object.keys(row).find(k => k === 'SKU' && !k.includes('MSKU'));
+                        let storeKey = Object.keys(row).find(k => k.includes('店铺') || k.includes('STORE'));
+                        let qtyKey = Object.keys(row).find(k => k.includes('采购数量') || k.includes('QTY') || k.includes('数量'));
+
+                        // 缺少任何核心列则跳过该行
+                        if (!statusKey || !skuKey || !storeKey || !qtyKey) return;
+
+                        // 逻辑 1：只识别 已签收 + 待签收
+                        const status = String(row[statusKey] || '').trim();
+                        if (!status.includes('待签收') && !status.includes('已签收')) return;
+
+                        // 提取基础数据并全转大写防呆
+                        const inSku = String(row[skuKey] || '').replace(/[\t\n\r]/g, '').trim().toUpperCase();
+                        const inStore = String(row[storeKey] || '').toUpperCase();
+                        const inQty = parseInt(row[qtyKey]) || 0;
+
+                        if (inQty === 0 || !inSku) return;
+
+                        // 逻辑 2：表格里的店铺名 包含 KSA 对应沙特，包含 UAE 对应迪拜
+                        let inCountry = '';
+                        if (inStore.includes('KSA')) {
+                            inCountry = '沙特';
+                        } else if (inStore.includes('UAE')) {
+                            inCountry = '迪拜';
+                        } else {
+                            return; // 既没KSA也没UAE，说明不是目标区域的数据，直接跳过
+                        }
+
+                        // 逻辑 3：匹配 SKU/MSKU + 国家，条件相同的在途直接合并（累加）
+                        const target = processedData.value.find(item => {
+                            // 原表格可能有多店铺聚合，SKU/MSKU是用逗号隔开的，拆开匹配
+                            const itemSkus = [];
+                            [item.sku, item.msku].forEach(val => {
+                                if (!val) return;
+                                String(val).toUpperCase().split(/[,，;；]/).forEach(s => {
+                                    const t = s.replace(/[\t\n\r\s]/g, '').trim();
+                                    if (t) itemSkus.push(t);
+                                });
+                            });
+                            
+                            const isSkuMatch = itemSkus.includes(inSku);
+                            const isCountryMatch = item.country === inCountry;
+                            
+                            return isSkuMatch && isCountryMatch;
+                        });
+
+                        // 找到目标后，无论导入表里有几行一样的，都会一直叠加累加进去
+                        if (target) {
+                            target.onTheWay += inQty;
+                            target.tempOnTheWay = target.onTheWay; // 同步视图框显示
+                            matchCount++;
+                            addedQty += inQty;
+                        }
+                    });
+
+                    if (matchCount > 0) {
+                        alert(`本地在途导入完成！\n成功合并匹配 ${matchCount} 条记录，合计增加了 ${addedQty} 个在途库存。`);
+                    } else {
+                        alert("导入完成，但未能成功叠加。\n请检查：\n1. 状态是否为「待签收/已签收」\n2. 店铺名列是否带有 KSA 或 UAE\n3. SKU是否与底表一致");
+                    }
+                };
+
+                const processSkuBaseData = (data) => {
+                    const map = {};
+                    data.forEach(rawRow => {
+                        const row = {};
+                        for (let k in rawRow) {
+                            const cleanKey = k ? String(k).replace(/[\s\uFEFF\xa0"']/g, '').toLowerCase() : '';
+                            row[cleanKey] = rawRow[k];
+                        }
+                        const keys = Object.keys(row);
+                        
+                        let skuKey = keys.find(k => k === '库存sku' || k === 'sku');
+                        if (!skuKey || !row[skuKey]) return;
+                        const sku = String(row[skuKey]).replace(/[\t\n\r\s]/g, ''); 
+                        
+                        let imgKey = keys.find(k => k.includes('图片'));
+                        const image = imgKey ? String(row[imgKey] || '').trim() : '';
+                        
+                        let statusKey = keys.find(k => k.includes('状态'));
+                        const status = statusKey ? String(row[statusKey] || '').trim() : '';
+                        
+                        let catKey = keys.find(k => k.includes('分类'));
+                        let finalCat = '';
+                        if (catKey && row[catKey]) {
+                            const tags = String(row[catKey]).split(/[,;，；]/).map(t => t.trim());
+                            const validTags = tags.filter(t => ALLOWED_CATEGORIES.includes(t));
+                            finalCat = validTags.join(', ');
+                        }
+                        
+                        let createTimeKey = keys.find(k => k.includes('创建时间'));
+                        let monthsSinceCreation = 999;
+                        if (createTimeKey && row[createTimeKey]) {
+                            const createTimeStr = String(row[createTimeKey]).trim();
+                            // Fix Safari/cross-browser date parsing for "YYYY-MM-DD HH:mm:ss" by replacing '-' with '/'
+                            const safeDateStr = createTimeStr.replace(/-/g, '/');
+                            const createTime = new Date(safeDateStr);
+                            if (!isNaN(createTime)) {
+                                const diffMs = Date.now() - createTime.getTime();
+                                monthsSinceCreation = diffMs / (1000 * 60 * 60 * 24 * 30.44);
+                            }
+                        }
+
+                        // 提取重量 (g 转换为 kg) 与商品体积重 (kg)
+                        let weightKey = keys.find(k => k === '重量' || k === 'weight' || (k.includes('重量') && !k.includes('体积')));
+                        let weightRaw = weightKey ? parseFloat(String(row[weightKey]).replace(/[^0-9.]/g, '')) : NaN;
+                        let weightKg = (!isNaN(weightRaw) && weightRaw > 0) ? (weightRaw / 1000) : null;
+
+                        let volWeightKey = keys.find(k => k === '商品体积重' || k === '体积重' || k.includes('体积重') || k.includes('volumeweight'));
+                        let volWeightRaw = volWeightKey ? parseFloat(String(row[volWeightKey]).replace(/[^0-9.]/g, '')) : NaN;
+                        let volumeWeightKg = (!isNaN(volWeightRaw) && volWeightRaw > 0) ? volWeightRaw : null;
+
+                        // 新增：提取仓库名称与仓库成本价 (RMB)
+                        let whKey = keys.find(k => k.includes('仓库名称') || k === '仓库' || k.includes('warehouse'));
+                        const warehouse = whKey ? String(row[whKey] || '').trim() : '';
+
+                        let costKey = keys.find(k => k.includes('仓库成本价') || k.includes('成本价') || k.includes('cost'));
+                        let costRaw = costKey ? parseFloat(String(row[costKey]).replace(/[^0-9.]/g, '')) : NaN;
+                        const cost = (!isNaN(costRaw) && costRaw > 0) ? costRaw : null;
+
+                        if (!map[sku]) {
+                            map[sku] = { 
+                                image, status, category: finalCat, monthsSinceCreation, weight: weightKg, volumeWeight: volumeWeightKg,
+                                warehouseCosts: {}
+                            };
+                        } else {
+                            if (!map[sku].image && image) map[sku].image = image;
+                            if (!map[sku].status && status) map[sku].status = status;
+                            if (!map[sku].category && finalCat) map[sku].category = finalCat;
+                            if ((map[sku].weight === null || map[sku].weight === undefined) && weightKg) map[sku].weight = weightKg;
+                            if ((map[sku].volumeWeight === null || map[sku].volumeWeight === undefined) && volumeWeightKg) map[sku].volumeWeight = volumeWeightKg;
+                            if (map[sku].monthsSinceCreation === 999 && monthsSinceCreation !== 999) map[sku].monthsSinceCreation = monthsSinceCreation;
+                            if (!map[sku].warehouseCosts) map[sku].warehouseCosts = {};
+                        }
+
+                        // 仓库成本价(RMB)为0的数据无效，大于0才录入
+                        if (warehouse && cost !== null && cost > 0) {
+                            map[sku].warehouseCosts[warehouse] = cost;
+                        }
+                    });
+                    
+                    if (Object.keys(map).length === 0) {
+                        alert("未能识别任何 SKU 信息！请确保表格包含【库存SKU】、【状态】等列名。");
+                        return;
+                    }
+                    skuBaseMap.value = map;
+                };
+
+                const createReactiveItem = (baseData) => {
+                    return {
+                        ...baseData,
+                        actualRestock: baseData.actualRestock || '', // 新增：实际补货量
+                        get isNewProduct() {
+                            // SKU/MSKU 可能为多店铺聚合（逗号+空格拼接多个值），需拆分后逐个匹配 skuBaseMap
+                            const candidates = [];
+                            [this.msku, this.sku].forEach(val => {
+                                if (!val) return;
+                                String(val).split(/[,，;；]/).forEach(s => {
+                                    const t = s.replace(/[\t\n\r\s]/g, '');
+                                    if (t) candidates.push(t);
+                                });
+                            });
+                            for (const cand of candidates) {
+                                const info = skuBaseMap.value[cand];
+                                if (info && info.monthsSinceCreation !== undefined && info.monthsSinceCreation <= settings.value.newProductThresholdMonths) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        },
+                        get dailySales() {
+                            if (settings.value.salesCalcMethod === 'average') {
+                                return this.monthlySales / 30;
+                            } else {
+                                if (this.isNewProduct) {
+                                    const totalW = (settings.value.weightNew7 + settings.value.weightNew14 + settings.value.weightNew30) || 100;
+                                    const w7 = settings.value.weightNew7 / totalW;
+                                    const w14 = settings.value.weightNew14 / totalW;
+                                    const w30 = settings.value.weightNew30 / totalW;
+                                    return (this.avg7 * w7) + (this.avg14 * w14) + (this.avg30 * w30);
+                                } else {
+                                    const totalW = (settings.value.weight7 + settings.value.weight14 + settings.value.weight30) || 100;
+                                    const w7 = settings.value.weight7 / totalW;
+                                    const w14 = settings.value.weight14 / totalW;
+                                    const w30 = settings.value.weight30 / totalW;
+                                    return (this.avg7 * w7) + (this.avg14 * w14) + (this.avg30 * w30);
+                                }
+                            }
+                        },
+                        get calculatedMonthlySales() {
+                            if (settings.value.salesCalcMethod === 'average') return this.monthlySales;
+                            return this.dailySales * 30;
+                        },
+                        get monthlySalesTooltip() {
+                            if (settings.value.salesCalcMethod === 'average') {
+                                return `原30天销量: ${this.monthlySales}`;
+                            } else {
+                                const daily = this.dailySales.toFixed(2);
+                                const isNew = this.isNewProduct;
+                                const w7 = isNew ? settings.value.weightNew7 : settings.value.weight7;
+                                const w14 = isNew ? settings.value.weightNew14 : settings.value.weight14;
+                                const w30 = isNew ? settings.value.weightNew30 : settings.value.weight30;
+                                const tag = isNew ? '新品' : '老品';
+                                return `原30天销量: ${this.monthlySales}\n加权公式(${tag}): (7天均值×${w7}% + 14天均值×${w14}% + 30天均值×${w30}%) × 30\n当前核算日均: ${daily} 个/天`;
+                            }
+                        },
+                        get availableDays() {
+                            const totalStock = (this.fbaStock || 0) + (this.onTheWay || 0);
+                            const daily = this.dailySales;
+                            return daily > 0 ? totalStock / daily : Infinity;
+                        },
+                        get triggerDays() {
+                            let days = 0;
+                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
+                                days = this.logistics === '空运' ? settings.value.uaeAirLeadTime : settings.value.uaeSeaLeadTime;
+                            } else if (this.country.includes('沙特')) {
+                                days = this.logistics === '空运' ? settings.value.ksaAirLeadTime : settings.value.ksaSeaLeadTime;
+                            }
+                            return days + settings.value.safeStock;
+                        },
+                        get airRate() {
+                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
+                                return settings.value.uaeAirFreightRate || 51.1;
+                            }
+                            return settings.value.ksaAirFreightRate || 72.45;
+                        },
+                        get seaRate() {
+                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
+                                return settings.value.uaeSeaFreightRate || 15.0;
+                            }
+                            return settings.value.ksaSeaFreightRate || 20.0;
+                        },
+                        get airLeadTime() {
+                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
+                                return settings.value.uaeAirLeadTime;
+                            }
+                            return settings.value.ksaAirLeadTime;
+                        },
+                        get seaLeadTime() {
+                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
+                                return settings.value.uaeSeaLeadTime;
+                            }
+                            return settings.value.ksaSeaLeadTime;
+                        },
+                        get airTriggerDays() {
+                            return this.airLeadTime + settings.value.safeStock;
+                        },
+                        get urgentAirRisk() {
+                            if (this.logistics !== '海运' || this.suggestedRestock <= 0) return false;
+                            return this.availableDays <= this.airTriggerDays || this.fbaStock === 0;
+                        },
+                        get hasValidWeight() {
+                            return this.weight !== null && this.weight !== undefined && !isNaN(this.weight) && Number(this.weight) > 0;
+                        },
+                        get hasValidVolumeWeight() {
+                            return this.volumeWeight !== null && this.volumeWeight !== undefined && !isNaN(this.volumeWeight) && Number(this.volumeWeight) > 0;
+                        },
+                        get weightErrorMsg() {
+                            const hasW = this.hasValidWeight;
+                            const hasV = this.hasValidVolumeWeight;
+                            if (!hasW && !hasV) return '缺实重与体积重(非真0)';
+                            if (!hasW) return '缺实重(非真0)';
+                            if (!hasV) return '缺体积重(非真0)';
+                            return '';
+                        },
+                        get hasWeightError() {
+                            return !!this.weightErrorMsg;
+                        },
+                        get urgentAirCostDiff() {
+                            const hasW = this.hasValidWeight;
+                            const hasV = this.hasValidVolumeWeight;
+                            const isMissingData = !hasW || !hasV;
+
+                            const w = hasW ? Number(this.weight) : 0;
+                            const v = hasV ? Number(this.volumeWeight) : (hasW ? Number(this.weight) : 0);
+                            
+                            const airPerUnit = w * this.airRate;
+                            const seaPerUnit = v * this.seaRate;
+                            const diffPerUnit = airPerUnit - seaPerUnit;
+                            const totalDiff = Math.max(0, diffPerUnit * this.suggestedRestock);
+
+                            return {
+                                airPerUnit,
+                                seaPerUnit,
+                                diffPerUnit,
+                                totalDiff,
+                                hasW,
+                                hasV,
+                                isMissingData
+                            };
+                        },
+                        get isOosOptimized() {
+                            return settings.value.oosOptimizationEnabled && this.fbaStock === 0;
+                        },
+                        get suggestedRestock() {
+                            const daily = this.dailySales; 
+                            if (daily <= 0) return 0;
+                            
+                            const trigger = this.triggerDays;
+                            const avail = this.availableDays;
+                            const onTheWay = this.onTheWay || 0;
+                            const calculatedMonthly = this.calculatedMonthlySales; 
+
+                            if (this.isOosOptimized) {
+                                let suggested = 0;
+                                const method = settings.value.oosCalcMethod;
+                                if (method === 1) {
+                                    suggested = (trigger * daily) - onTheWay;
+                                } else if (method === 2) {
+                                    suggested = calculatedMonthly + (settings.value.safeStock * daily) - onTheWay;
+                                } else if (method === 3) {
+                                    suggested = calculatedMonthly - onTheWay;
+                                }
+                                return Math.max(0, Math.ceil(suggested));
+                            }
+
+                            if (avail <= trigger) {
+                                const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
+                                return Math.max(0, Math.ceil((trigger - avail + base) * daily));
+                            }
+                            return 0;
+                        },
+                        get restockTooltip() {
+                            const daily = this.dailySales;
+                            const trigger = this.triggerDays;
+                            const avail = this.availableDays;
+                            const onTheWay = this.onTheWay || 0;
+                            const monthly = this.calculatedMonthlySales; 
+                            const restock = this.suggestedRestock;
+
+                            let prefixStr = '';
+                                if (this.logistics === '空海结合') {
+                                    const airRatio = settings.value.airSeaRatio / 100;
+                                    const seaRatio = 1 - airRatio;
+                                    const airQty = Math.round(restock * airRatio);
+                                    const seaQty = Math.round(restock * seaRatio);
+                                    prefixStr = `空运：${airQty} 个  海运：${seaQty} 个\n====================\n`;
+                                }
+
+                            if (this.isOosOptimized) {
+                                const method = settings.value.oosCalcMethod;
+                                let mathStr = '';
+                                if(method === 1) {
+                                    mathStr = `(${trigger}天) × ${daily.toFixed(2)} - ${onTheWay} = ${restock}`;
+                                } else if(method === 2) {
+                                    mathStr = `${Math.round(monthly)} + (${settings.value.safeStock}天 × ${daily.toFixed(2)}) - ${onTheWay} = ${restock}`;
+                                } else if(method === 3) {
+                                    mathStr = `${Math.round(monthly)} - ${onTheWay} = ${restock}`;
+                                }
+                                return `${prefixStr}【断货优化计算过程】\n${mathStr}`;
+                            }
+
+                            if (avail <= trigger) {
+                                const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
+                                let mathStr = `(${trigger}天 - ${avail.toFixed(1)}天 + ${base}天) × ${daily.toFixed(2)} = ${restock}`;
+                                return `${prefixStr}【常规补货计算过程】\n${mathStr}`;
+                            }
+                            return this.logistics === '空海结合' ? `${prefixStr}库存充足，暂无需补货` : `库存充足，暂无需补货`;
+                        },
+                        get isHighVolatile() {
+                            if (!this.salesTrend || this.salesTrend.length === 0) return false;
+                            const maxDaily = Math.max(...this.salesTrend.map(s => s.val));
+                            const calcMonthly = this.calculatedMonthlySales;
+                            if(calcMonthly < 5) return false; 
+                            return ((maxDaily / calcMonthly) * 100) >= settings.value.volatilityThreshold;
+                        },
+                        get matchedCostInfo() {
+                            let warehouseCosts = {};
+                            const candidates = [];
+                            [this.sku, this.msku, this.primaryMsku].forEach(val => {
+                                if (!val) return;
+                                String(val).split(/[,，;；]/).forEach(s => {
+                                    const t = s.replace(/[\t\n\r\s]/g, '').trim().toUpperCase();
+                                    if (t && !candidates.includes(t)) candidates.push(t);
+                                });
+                            });
+
+                            for (const c of candidates) {
+                                const info = skuBaseMap.value[c];
+                                if (info && info.warehouseCosts && Object.keys(info.warehouseCosts).length > 0) {
+                                    warehouseCosts = info.warehouseCosts;
+                                    break;
+                                }
+                            }
+
+                            const country = String(this.country || '');
+                            const msku = String(this.primaryMsku || this.msku || '').toUpperCase();
+                            const store = String(this.primaryStore || this.store || '').toUpperCase();
+                            const isSF = msku.includes('SF');
+
+                            let targetWh = '';
+                            let costType = isSF ? 'SF' : 'FBA';
+
+                            // 1. 沙特(跨国) 按 迪拜 匹配
+                            const isDubai = country.includes('迪拜') || country.includes('阿联酋') || country.includes('跨国');
+                            const isSaudi = country.includes('沙特') && !country.includes('跨国');
+
+                            if (isDubai) {
+                                if (isSF) {
+                                    targetWh = '迪拜W18-SF仓';
+                                    costType = 'SF';
+                                } else {
+                                    targetWh = '迪拜FBA仓';
+                                    costType = 'FBA';
+                                }
+                            } else if (isSaudi) {
+                                if (!isSF) {
+                                    targetWh = '沙特FBA仓';
+                                    costType = 'FBA';
+                                } else {
+                                    costType = 'SF';
+                                    if (store.includes('A064') || store.includes('A286') || store.includes('KSA-A064') || store.includes('KSA-A286')) {
+                                        targetWh = '沙特YB-SF仓';
+                                    } else if (store.includes('A186') || store.includes('KSA-A186')) {
+                                        targetWh = '沙特老-SF仓';
+                                    } else {
+                                        targetWh = '沙特YB-SF仓';
+                                    }
+                                }
+                            }
+
+                            let cost = null;
+                            let usedWarehouse = targetWh;
+                            let isFallback = false;
+
+                            if (targetWh && warehouseCosts[targetWh] !== undefined && warehouseCosts[targetWh] > 0) {
+                                cost = warehouseCosts[targetWh];
+                            } else {
+                                // 匹配不到直接显示深圳仓成本
+                                if (warehouseCosts['深圳仓'] !== undefined && warehouseCosts['深圳仓'] > 0) {
+                                    cost = warehouseCosts['深圳仓'];
+                                    usedWarehouse = '深圳仓';
+                                    isFallback = true;
+                                } else {
+                                    const validWhKeys = Object.keys(warehouseCosts);
+                                    if (validWhKeys.length > 0) {
+                                        usedWarehouse = validWhKeys[0];
+                                        cost = warehouseCosts[usedWarehouse];
+                                        isFallback = true;
+                                    }
+                                }
+                            }
+
+                            return {
+                                cost: cost,
+                                targetWarehouse: targetWh,
+                                usedWarehouse: usedWarehouse,
+                                costType: costType,
+                                isFallback: isFallback,
+                                allCosts: warehouseCosts
+                            };
+                        },
+                        get skuCost() {
+                            return this.matchedCostInfo.cost;
+                        },
+                        get lossWarning() {
+                            const price = this.price;
+                            const costInfo = this.matchedCostInfo;
+                            const cost = costInfo.cost;
+                            if (price === null || price === undefined || isNaN(price) || cost === null || cost === undefined || isNaN(cost)) {
+                                return { isLoss: false, diff: null, threshold: null, costType: costInfo.costType, message: '' };
+                            }
+                            const diff = price - cost;
+                            const fbaTh = (settings.value.fbaLossThreshold !== undefined && settings.value.fbaLossThreshold !== null && !isNaN(settings.value.fbaLossThreshold)) ? Number(settings.value.fbaLossThreshold) : 10;
+                            const sfTh = (settings.value.sfLossThreshold !== undefined && settings.value.sfLossThreshold !== null && !isNaN(settings.value.sfLossThreshold)) ? Number(settings.value.sfLossThreshold) : 12;
+                            const threshold = costInfo.costType === 'SF' ? sfTh : fbaTh;
+                            const isLoss = diff < threshold;
+                            return {
+                                isLoss: isLoss,
+                                diff: diff,
+                                threshold: threshold,
+                                costType: costInfo.costType,
+                                message: isLoss ? '⚠️ 留意是否亏本' : ''
+                            };
+                        }
+                    };
+                };
+
+                // 智能从文本 (如 MSKU) 中提取马帮库存 SKU：
+                // 格式1: 两个字母 + 四个数字 (如 EK9819, FD0576)
+                // 格式2: 两个字母 + 四个数字 + 一个字母 (如 EK9819A, FD0576B)
+                const extractSkuFromText = (text) => {
+                    if (!text) return '';
+                    const str = String(text).trim();
+                    // 严格边界匹配 (非字母数字边界)
+                    const regexBounded = /(?:^|[^a-zA-Z0-9])([a-zA-Z]{2}\d{4}[a-zA-Z]?)(?=[^a-zA-Z0-9]|$)/gi;
+                    const matches = [];
+                    let m;
+                    while ((m = regexBounded.exec(str)) !== null) {
+                        matches.push(m[1].toUpperCase());
+                    }
+                    if (matches.length > 0) {
+                        return Array.from(new Set(matches)).join(', ');
+                    }
+                    // 次选宽松匹配 (无边界限制)
+                    const regexLoose = /[a-zA-Z]{2}\d{4}[a-zA-Z]?(?!\d)/gi;
+                    const looseMatches = str.match(regexLoose);
+                    if (looseMatches && looseMatches.length > 0) {
+                        return Array.from(new Set(looseMatches.map(s => s.toUpperCase()))).join(', ');
+                    }
+                    return '';
+                };
+
+                const processSalesData = (data) => {
+                    const groupedMap = new Map();
+                    
+                    data.forEach((rawRow, rowIndex) => {
+                        const row = {};
+                        for (let k in rawRow) {
+                            const cleanKey = k ? String(k).replace(/[\s\uFEFF\xa0"']/g, '').toLowerCase() : '';
+                            row[cleanKey] = rawRow[k];
+                        }
+                        const keys = Object.keys(row);
+
+                        // 需求1：listing状态为已删除的数据无效，直接跳过
+                        let listingStatusKey = keys.find(k => k.includes('listing状态') || k.includes('listingstatus') || k.includes('listing_status') || k === 'listing 状态');
+                        const listingStatus = listingStatusKey ? String(row[listingStatusKey] || '').trim() : '';
+                        if (listingStatus.includes('已删除')) {
+                            return;
+                        }
+
+                        // 需求1：提取售价
+                        let priceKey = keys.find(k => k === '售价' || k.includes('售价') || k.includes('价格') || k === 'price' || k.includes('saleprice'));
+                        let priceRaw = priceKey ? parseFloat(String(row[priceKey]).replace(/[^0-9.]/g, '')) : NaN;
+                        const price = (!isNaN(priceRaw) && priceRaw > 0) ? priceRaw : null;
+                        
+                        const isNewVersion = keys.some(k => k.includes('7天销量') || k.includes('14天销量') || k.includes('90天销量'));
+
+                        let monthlySalesKey = keys.find(k => k.includes('小计') || k.includes('30天') || k.includes('月销'));
+                        const monthlySales = monthlySalesKey ? (parseInt(row[monthlySalesKey]) || 0) : 0;
+
+                        let mskuKey = keys.find(k => k.includes('msku'));
+                        // 标准化 MSKU（去除所有空白），与 skuBaseMap 的 key 规则一致
+                        const msku = mskuKey ? String(row[mskuKey] || '').replace(/[\t\n\r\s]/g, '') : '';
+                        
+                        let storeKey = keys.find(k => k.includes('店铺'));
+                        const store = storeKey ? String(row[storeKey] || '') : '';
+
+                        let asinKey = keys.find(k => k === 'asin' || k.includes('asin'));
+                        const asin = asinKey ? String(row[asinKey] || '').replace(/[\t\n\r]/g, '').trim() : '';
+
+                        let skuKey = keys.find(k => k === 'sku' || k === '库存sku');
+                        if (!skuKey) skuKey = keys.find(k => k.includes('sku') && !k.includes('msku') && !k.includes('fnsku'));
+                        
+                        let rawSku = skuKey ? String(row[skuKey] || '').replace(/[\t\n\r\s]/g, '') : '';
+                        // 判定 rawSku 是否为有效值（若为空、'-'、'--'、'无'、'/'、'null' 均视为空缺）
+                        const isInvalidSku = !rawSku || rawSku === '-' || rawSku === '--' || rawSku === '无' || rawSku === '/' || rawSku.toLowerCase() === 'null';
+
+                        let sku = rawSku;
+                        if (isInvalidSku && msku) {
+                            // 当 SKU 为 '-' 或无 SKU 时，自动从 MSKU 中提取符合格式的马帮库存 SKU
+                            sku = extractSkuFromText(msku);
+                        } else if (isInvalidSku) {
+                            sku = '';
+                        }
+
+                        let nameKey = keys.find(k => k.includes('品名') || k.includes('name'));
+                        const name = nameKey ? String(row[nameKey] || '') : '';
+                        const weightMatch = name.match(/重(\d+(\.\d+)?)/);
+                        const weight = weightMatch ? parseFloat(weightMatch[1]) : null;
+                        const weightError = weight === null;
+
+                        let displayCountry = '未知';
+                        const storeUpper = store.toUpperCase();
+                        const hasUAE = storeUpper.includes('UAE');
+                        const hasKSA = storeUpper.includes('KSA');
+
+                        if (hasUAE && hasKSA) {
+                            displayCountry = '沙特(跨国)';
+                        } else if (hasKSA) {
+                            displayCountry = '沙特';
+                        } else if (hasUAE) {
+                            displayCountry = '迪拜';
+                        } else {
+                            let countryKey = keys.find(k => k.includes('国家') || k.includes('country'));
+                            const countryRaw = countryKey ? String(row[countryKey] || '').toLowerCase() : '';
+                            if (countryRaw.includes('沙特') || countryRaw.includes('ksa')) displayCountry = '沙特';
+                            else if (countryRaw.includes('阿联酋') || countryRaw.includes('uae') || countryRaw.includes('迪拜')) displayCountry = '迪拜';
+                        }
+
+                        let fbaKey = keys.find(k => k === 'fba可售' || k === '可售' || k === 'fba');
+                        const fbaStock = fbaKey ? (parseInt(row[fbaKey]) || 0) : 0;
+
+                        let defaultOnTheWay = 0;
+                        const onTheWayCols = ['待调仓', '调仓中', '入库中', '在途', '计划入库'];
+                        for(let k of keys) {
+                            if(onTheWayCols.some(col => k.includes(col)) && !k.includes('采购在途') && !k.includes('本地库存')) {
+                                defaultOnTheWay += (parseInt(row[k]) || 0);
+                            }
+                        }
+
+                        let salesArray = [];
+                        let newAvg7 = 0;
+                        let newAvg14 = 0;
+                        let newAvg30 = 0;
+                        
+                        if (isNewVersion) {
+                            let sales7Key = keys.find(k => k.includes('7天销量') || k === '7天');
+                            let sales14Key = keys.find(k => k.includes('14天销量') || k === '14天');
+                            
+                            newAvg7 = sales7Key ? (parseInt(row[sales7Key]) || 0) : 0;
+                            newAvg14 = sales14Key ? (parseInt(row[sales14Key]) || 0) : 0;
+                            newAvg30 = monthlySales;
+
+                            const avg1 = newAvg7 / 7;
+                            const avg2 = Math.max(0, newAvg14 - newAvg7) / 7;
+                            const avg3 = Math.max(0, newAvg30 - newAvg14) / 16;
+                            
+                            for(let i=30; i>=1; i--) {
+                                let val = 0;
+                                if (i <= 7) val = avg1;
+                                else if (i <= 14) val = avg2;
+                                else val = avg3;
+                                
+                                salesArray.push({
+                                    date: `前${i}天`,
+                                    val: val
+                                });
+                            }
+                        } else {
+                            let salesKeys = keys.filter(k => (/\d{1,2}[-月]\d{1,2}/.test(k) || k.includes('销量')) && !k.includes('小计') && !k.includes('30天') && !k.includes('月销'));
+                            salesKeys.sort(); 
+                            salesKeys.forEach(k => {
+                                let dateLabel = k.replace(/销量|销|日/g, '').trim(); 
+                                salesArray.push({
+                                    date: dateLabel,
+                                    val: parseInt(row[k]) || 0
+                                });
+                            });
+                        }
+
+                        const mskuDetail = {
+                            msku: msku,
+                            store: store,
+                            price: price,
+                            sales7: newAvg7,
+                            sales14: newAvg14,
+                            sales30: monthlySales
+                        };
+
+                        const groupKey = asin ? `${asin}_${displayCountry}` : `row_${rowIndex}`;
+                        // 行内 SKU/MSKU 可能为逗号分隔多个，拆分后逐个匹配 skuBaseMap（优先匹配SKU，次用MSKU），取第一个有基础信息的
+                        let baseInfo = {};
+                        const matchCandidates = [];
+                        [sku, msku].forEach(val => {
+                            if (!val) return;
+                            String(val).split(/[,，;；]/).map(s => s.replace(/[\t\n\r\s]/g, '')).filter(Boolean).forEach(c => {
+                                if (!matchCandidates.includes(c)) matchCandidates.push(c);
+                            });
+                        });
+                        for (const sc of matchCandidates) {
+                            const info = skuBaseMap.value[sc];
+                            if (info) {
+                                baseInfo = info;
+                                break;
+                            }
+                        }
+
+                        // 优先采用马帮基础库的实重 (kg) 和体积重 (kg)，若无则回退到品名解析重量（<=0 均视为缺数据）
+                        const actualWeight = (baseInfo.weight !== undefined && baseInfo.weight !== null && Number(baseInfo.weight) > 0) ? Number(baseInfo.weight) : (weight && Number(weight) > 0 ? Number(weight) : null);
+                        const actualVolumeWeight = (baseInfo.volumeWeight !== undefined && baseInfo.volumeWeight !== null && Number(baseInfo.volumeWeight) > 0) ? Number(baseInfo.volumeWeight) : actualWeight;
+                        const actualWeightError = actualWeight === null || isNaN(actualWeight) || actualWeight <= 0;
+
+                        const uaeVolThreshold = (settings.value.uaeVolumeWeightThreshold !== undefined && settings.value.uaeVolumeWeightThreshold !== null && !isNaN(settings.value.uaeVolumeWeightThreshold)) ? Number(settings.value.uaeVolumeWeightThreshold) : 0.8;
+                        const ksaVolThreshold = (settings.value.ksaVolumeWeightThreshold !== undefined && settings.value.ksaVolumeWeightThreshold !== null && !isNaN(settings.value.ksaVolumeWeightThreshold)) ? Number(settings.value.ksaVolumeWeightThreshold) : 0.8;
+
+                        let logistics = '空运';
+                        // 1. 体积重优先判定：只要体积重大于等于警戒线（默认0.8kg），无论实重如何，均直接走海运
+                        if (actualVolumeWeight !== null && !isNaN(actualVolumeWeight) && actualVolumeWeight > 0) {
+                            if (displayCountry.includes('迪拜') && actualVolumeWeight >= uaeVolThreshold) {
+                                logistics = '海运';
+                            } else if (displayCountry.includes('沙特') && actualVolumeWeight >= ksaVolThreshold) {
+                                logistics = '海运';
+                            }
+                        }
+
+                        // 2. 若体积重未达到警戒线，且实重有效，再按实重分界线判定
+                        if (logistics !== '海运' && !actualWeightError) {
+                            if (displayCountry.includes('迪拜') && actualWeight > settings.value.uaeWeightThreshold) logistics = '海运';
+                            if (displayCountry.includes('沙特') && actualWeight > settings.value.ksaWeightThreshold) logistics = '海运';
+                        }
+
+                        if (groupedMap.has(groupKey)) {
+                            let existing = groupedMap.get(groupKey);
+                            
+                            existing.monthlySales += monthlySales;
+                            existing.fbaStock += fbaStock;
+                            existing.onTheWay += defaultOnTheWay;
+                            existing.tempFbaStock = existing.fbaStock; 
+                            existing.tempOnTheWay = existing.onTheWay;
+
+                            if (isNewVersion) {
+                                existing.isNewVersion = true;
+                                existing.totalSales7 = (existing.totalSales7 || 0) + newAvg7;
+                                existing.totalSales14 = (existing.totalSales14 || 0) + newAvg14;
+                            }
+
+                            existing.salesTrend.forEach((trend) => {
+                                const match = salesArray.find(s => s.date === trend.date);
+                                if (match) trend.val += match.val;
+                            });
+
+                            if (msku) {
+                                let arr = existing.msku ? existing.msku.split(', ') : [];
+                                if (!arr.includes(msku)) arr.push(msku);
+                                existing.msku = arr.join(', ');
+                                existing.mskuList.push(mskuDetail);
+                            }
+                            if (sku) {
+                                let arr = existing.sku ? existing.sku.split(', ') : [];
+                                if (!arr.includes(sku)) {
+                                    arr.push(sku);
+                                    if(!existing.skuImage && baseInfo.image) existing.skuImage = baseInfo.image;
+                                    if(!existing.skuStatus && baseInfo.status) existing.skuStatus = baseInfo.status;
+                                    if(!existing.skuCategory && baseInfo.category) existing.skuCategory = baseInfo.category;
+                                    if((existing.weight === null || existing.weight === undefined || existing.weight <= 0) && baseInfo.weight && baseInfo.weight > 0) existing.weight = baseInfo.weight;
+                                    if((existing.volumeWeight === null || existing.volumeWeight === undefined || existing.volumeWeight <= 0) && baseInfo.volumeWeight && baseInfo.volumeWeight > 0) existing.volumeWeight = baseInfo.volumeWeight;
+                                    if(existing.weightError && baseInfo.weight && baseInfo.weight > 0) existing.weightError = false;
+
+                                    if (existing.logistics === '空运') {
+                                        const isUAE = existing.country.includes('迪拜');
+                                        const isKSA = existing.country.includes('沙特');
+                                        if (existing.volumeWeight && ((isUAE && existing.volumeWeight >= uaeVolThreshold) || (isKSA && existing.volumeWeight >= ksaVolThreshold))) {
+                                            existing.logistics = '海运';
+                                        } else if (existing.weight && ((isUAE && existing.weight > settings.value.uaeWeightThreshold) || (isKSA && existing.weight > settings.value.ksaWeightThreshold))) {
+                                            existing.logistics = '海运';
+                                        }
+                                    }
+                                }
+                                existing.sku = arr.join(', ');
+                            }
+                            if (store) {
+                                let arr = existing.store ? existing.store.split(', ') : [];
+                                if (!arr.includes(store)) arr.push(store);
+                                existing.store = arr.join(', ');
+                            }
+                            
+                        } else {
+                            groupedMap.set(groupKey, {
+                                id: groupKey, 
+                                selected: false,
+                                msku: msku, 
+                                store: store, 
+                                sku: sku,
+                                asin: asin,
+                                name: name,
+                                country: displayCountry,
+                                isNewVersion: isNewVersion,
+                                totalSales7: newAvg7,
+                                totalSales14: newAvg14,
+                                skuImage: baseInfo.image || '',
+                                skuStatus: baseInfo.status || '',
+                                skuCategory: baseInfo.category || '',
+                                monthlySales: monthlySales, 
+                                fbaStock: fbaStock,
+                                onTheWay: defaultOnTheWay,
+                                tempFbaStock: fbaStock,
+                                tempOnTheWay: defaultOnTheWay, 
+                                weight: actualWeight,
+                                volumeWeight: actualVolumeWeight,
+                                weightError: actualWeightError,
+                                logistics: logistics,
+                                itemType: '平款', 
+                                salesTrend: salesArray,
+                                actualRestock: '',
+                                mskuList: msku ? [mskuDetail] : []
+                            });
+                        }
+                    });
+
+                    const parsed = [];
+                    const getSum = (arr) => arr.reduce((acc, cur) => acc + cur, 0);
+
+                    for (let item of groupedMap.values()) {
+                        if (item.monthlySales === 0 && item.fbaStock === 0) continue; 
+                        
+                        const last7 = item.salesTrend.slice(-7).map(s => s.val);
+                        const last14 = item.salesTrend.slice(-14).map(s => s.val);
+                        const last30 = item.salesTrend.slice(-30).map(s => s.val);
+                        item.avg7 = last7.length ? getSum(last7) / last7.length : 0;
+                        item.avg14 = last14.length ? getSum(last14) / last14.length : 0;
+                        item.avg30 = last30.length ? getSum(last30) / last30.length : 0;
+
+                        item.sparklinePoints = getSparklinePointsRaw(item.salesTrend);
+                        item.sparklinePath = getSparklinePathRaw(item.sparklinePoints);
+                        item.sparklineFill = getSparklineFillRaw(item.sparklinePoints);
+
+                        if (item.isNewVersion) {
+                            item.newTrendData = computeNewTrendData(item.totalSales7, item.totalSales14, item.monthlySales);
+                        }
+
+                        // 需求2 & 需求4：ASIN对应多MSKU，按销量降序排列（7天 > 14天 > 30天）
+                        let primaryMskuInfo = null;
+                        let chosenPrice = null;
+                        if (item.mskuList && item.mskuList.length > 0) {
+                            const sortedBySales = [...item.mskuList].sort((a, b) => {
+                                if ((b.sales7 || 0) !== (a.sales7 || 0)) return (b.sales7 || 0) - (a.sales7 || 0);
+                                if ((b.sales14 || 0) !== (a.sales14 || 0)) return (b.sales14 || 0) - (a.sales14 || 0);
+                                if ((b.sales30 || 0) !== (a.sales30 || 0)) return (b.sales30 || 0) - (a.sales30 || 0);
+                                return 0;
+                            });
+
+                            // 销量第一的作为主 MSKU 与主店铺（用于成本匹配）
+                            primaryMskuInfo = sortedBySales[0];
+
+                            // 售价选取：如果销量最多的MSKU没有售价，就以销量第二的售价为主，以此类推，直到找到有效售价；若全部都没有则为 null (显示 -)
+                            const mskuWithPrice = sortedBySales.find(m => m.price !== null && m.price !== undefined && !isNaN(m.price) && m.price > 0);
+                            chosenPrice = mskuWithPrice ? mskuWithPrice.price : null;
+                        }
+                        item.primaryMsku = primaryMskuInfo ? primaryMskuInfo.msku : item.msku;
+                        item.primaryStore = primaryMskuInfo ? primaryMskuInfo.store : item.store;
+                        item.price = chosenPrice;
+
+                        const reactiveItem = createReactiveItem(item);
+                        if (reactiveItem.calculatedMonthlySales >= settings.value.baoThreshold) {
+                            reactiveItem.itemType = '爆款';
+                        } else if (reactiveItem.calculatedMonthlySales >= settings.value.wangThreshold) {
+                            reactiveItem.itemType = '旺款';
+                        } else {
+                            reactiveItem.itemType = '平款';
+                        }
+                        parsed.push(reactiveItem);
+                    }
+
+                    if (parsed.length === 0) {
+                        alert("未识别到有效销量数据！请确认表格是否包含【小计】、【国家】、【ASIN】等列。");
+                        return;
+                    }
+
+                    parsed.sort((a, b) => {
+                        const aNeeds = a.suggestedRestock > 0 ? 1 : 0;
+                        const bNeeds = b.suggestedRestock > 0 ? 1 : 0;
+                        if (aNeeds !== bNeeds) return bNeeds - aNeeds;
+                        return a.availableDays - b.availableDays;
+                    });
+
+                    processedData.value = parsed;
+                    sortField.value = 'default';
+                };
+
+                const sortByField = (field) => {
+                    if (sortField.value === field) {
+                        sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc';
+                    } else {
+                        sortField.value = field;
+                        sortOrder.value = 'desc';
+                    }
+
+                    processedData.value.sort((a, b) => {
+                        let valA = 0; let valB = 0;
+                        if (field === 'monthlySales' || field === 'calculatedMonthlySales') {
+                            valA = a.calculatedMonthlySales; valB = b.calculatedMonthlySales;
+                        } else if (field === 'suggestedRestock') {
+                            valA = a.suggestedRestock; valB = b.suggestedRestock;
+                        }
+
+                        if (sortOrder.value === 'desc') return valB - valA;
+                        else return valA - valB;
+                    });
+                };
+
+                const filteredAndSortedData = computed(() => {
+                    let result = processedData.value;
+                    
+                    if (!settings.value.showKsaCrossBorder) {
+                        result = result.filter(item => item.country !== '沙特(跨国)');
+                    }
+
+                    if (hideSafe.value) result = result.filter(item => item.suggestedRestock > 0);
+                    if (filterCountry.value) result = result.filter(item => item.country === filterCountry.value);
+                    if (filterLogistics.value) result = result.filter(item => item.logistics === filterLogistics.value);
+                    if (filterItemType.value) result = result.filter(item => item.itemType === filterItemType.value);
+                    if (filterStatus.value) result = result.filter(item => item.skuStatus === filterStatus.value);
+                    if (filterNewProduct.value === 'new') result = result.filter(item => item.isNewProduct);
+                    if (filterNewProduct.value === 'old') result = result.filter(item => !item.isNewProduct);
+                    
+                    // 新增：搜索过滤
+                    if (searchQuery.value) {
+                        const query = searchQuery.value.trim().toLowerCase();
+                        if (searchType.value === 'sku') {
+                            result = result.filter(item => item.sku && item.sku.toLowerCase().includes(query));
+                        } else if (searchType.value === 'asin') {
+                            result = result.filter(item => item.asin && item.asin.toLowerCase().includes(query));
+                        }
+                    }
+
+                    return result;
+                });
+
+                // 获取当前数据中包含的所有 SKU 状态
+                const uniqueStatuses = computed(() => {
+                    const statuses = new Set(processedData.value.map(item => item.skuStatus).filter(Boolean));
+                    return Array.from(statuses).sort();
+                });
+
+
+                const totalPages = computed(() => Math.ceil(filteredAndSortedData.value.length / pageSize.value) || 1);
+                
+                const paginatedData = computed(() => {
+                    if(currentPage.value > totalPages.value) currentPage.value = 1;
+                    const start = (currentPage.value - 1) * pageSize.value;
+                    const end = start + pageSize.value;
+                    return filteredAndSortedData.value.slice(start, end);
+                });
+
+                const needRestockCount = computed(() => {
+                    return filteredAndSortedData.value.filter(item => item.suggestedRestock > 0).length;
+                });
+
+                const isAllSelected = computed(() => {
+                    if (filteredAndSortedData.value.length === 0) return false;
+                    return filteredAndSortedData.value.every(item => item.selected);
+                });
+
+                const toggleSelectAll = (e) => {
+                    const checked = e.target.checked;
+                    filteredAndSortedData.value.forEach(item => { item.selected = checked; });
+                };
+
+                const applyBatchLogistics = () => {
+                    if (!batchLogistics.value) return;
+                    filteredAndSortedData.value.filter(item => item.selected).forEach(item => {
+                        item.logistics = batchLogistics.value;
+                        item.weightError = false;
+                    });
+                    batchLogistics.value = '';
+                };
+
+                const applyBatchType = () => {
+                    if (!batchType.value) return;
+                    filteredAndSortedData.value.filter(item => item.selected).forEach(item => {
+                        item.itemType = batchType.value;
+                    });
+                    batchType.value = '';
+                };
+
+const exportExcel = () => {
+    const dataToExport = [];
+    // 遍历当前筛选出来的待补货数据
+    filteredAndSortedData.value
+        .filter(item => item.suggestedRestock > 0)
+        .forEach(item => {
+            if (item.logistics === '空海结合') {
+                const airRatio = settings.value.airSeaRatio / 100;
+                // 计算逻辑：空运四舍五入，海运 = 总数 - 空运（确保绝对守恒）
+                const airRestockQty = Math.round(item.suggestedRestock * airRatio);
+                const seaRestockQty = item.suggestedRestock - airRestockQty;
+
+                let airActualQty = '', seaActualQty = '';
+                if (item.actualRestock !== '' && item.actualRestock !== null) {
+                    airActualQty = Math.round(item.actualRestock * airRatio);
+                    seaActualQty = item.actualRestock - airActualQty;
+                }
+
+                // 1. 拆出空运记录
+                dataToExport.push({
+                    "MSKU": item.msku,
+                    "SKU": item.sku,
+                    "ASIN": item.asin,
+                    "店铺": item.store,
+                    "国家": item.country,
+                    "售价": item.price !== null ? item.price : '-',
+                    "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                    "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                    "建议补货数量": airRestockQty,
+                    "实际补货量": airActualQty,
+                    "运输方式": "空运",
+                    "商品属性": item.itemType,
+                    "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                    "最后备注": "空海结合" 
+                });
+
+                // 2. 拆出海运记录
+                dataToExport.push({
+                    "MSKU": item.msku,
+                    "SKU": item.sku,
+                    "ASIN": item.asin,
+                    "店铺": item.store,
+                    "国家": item.country,
+                    "售价": item.price !== null ? item.price : '-',
+                    "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                    "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                    "建议补货数量": seaRestockQty,
+                    "实际补货量": seaActualQty,
+                    "运输方式": "海运",
+                    "商品属性": item.itemType,
+                    "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                    "最后备注": "空海结合" 
+                });
+            } else {
+                // 普通纯空运/纯海运保持单行
+                dataToExport.push({
+                    "MSKU": item.msku,
+                    "SKU": item.sku,
+                    "ASIN": item.asin,
+                    "店铺": item.store,
+                    "国家": item.country,
+                    "售价": item.price !== null ? item.price : '-',
+                    "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                    "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                    "建议补货数量": item.suggestedRestock,
+                    "实际补货量": (item.actualRestock !== '' && item.actualRestock !== null) ? item.actualRestock : '',
+                    "运输方式": item.logistics,
+                    "商品属性": item.itemType,
+                    "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                    "最后备注": "" // 普通渠道备注留空
+                });
+            }
+        });
+    
+    if(dataToExport.length === 0) {
+        alert("当前列表没有需要补货的记录！");
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "补货计划");
+
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `补货计划表_${date}.xlsx`);
+};
+
+
+                watch([() => settings.value.baoThreshold, () => settings.value.wangThreshold, () => settings.value.salesCalcMethod, () => settings.value.weight7, () => settings.value.weight14, () => settings.value.weight30, () => settings.value.weightNew7, () => settings.value.weightNew14, () => settings.value.weightNew30, () => settings.value.newProductThresholdMonths, skuBaseMap], () => {
+                    processedData.value.forEach(item => {
+                        if (item.calculatedMonthlySales >= settings.value.baoThreshold) {
+                            item.itemType = '爆款';
+                        } else if (item.calculatedMonthlySales >= settings.value.wangThreshold) {
+                            item.itemType = '旺款';
+                        } else {
+                            item.itemType = '平款';
+                        }
+                    });
+                });
+
+                const getAmazonUrl = (asin, country) => {
+                    if (!asin) return '#';
+                    const cleanAsin = String(asin).split(/[,，]/)[0].trim(); 
+                    if (country && country.includes('沙特')) {
+                        return `https://www.amazon.sa/dp/${cleanAsin}`;
+                    }
+                    return `https://www.amazon.ae/dp/${cleanAsin}`;
+                };
+
+                const formatSkuCost = (cost) => {
+                    if (cost === null || cost === undefined || isNaN(cost)) return '-';
+                    const num = Number(cost);
+                    if (num < 0.1) {
+                        return num.toFixed(2);
+                    }
+                    return num.toFixed(1);
+                };
+
+                const getWarehouseCostTooltip = (item) => {
+                    const info = item.matchedCostInfo;
+                    if (!info || !info.allCosts || Object.keys(info.allCosts).length === 0) {
+                        return "暂无各仓库成本数据";
+                    }
+                    let str = `【当前匹配】${info.usedWarehouse}: ¥${info.cost ? formatSkuCost(info.cost) : '-'}\n(所属类型: ${info.costType}成本${info.isFallback ? '，源自深圳仓保底' : ''})\n====================\n【该 SKU 所有仓库成本清单】\n`;
+                    for (let wh in info.allCosts) {
+                        const marker = wh === info.usedWarehouse ? '👉 ' : '   ';
+                        str += `${marker}${wh}: ¥${formatSkuCost(info.allCosts[wh])}\n`;
+                    }
+                    return str;
+                };
+                // --------------------------------------------------------
+
+
+                return {
+                    settings, showSettings, showSOP, hideSafe, needRestockCount,
+                    isDragOver, hasSkuData,
+                    isConfigCollapsed,
+                    previewImage, previewVisible, previewPos, showPreview, hidePreview,
+                    airTooltipItem, airTooltipVisible, airTooltipPos, showAirTooltip, hideAirTooltip,
+                    trendTooltipItem, trendTooltipVisible, trendTooltipPos, trendHoverPoint, showTrendPreview, hideTrendPreview, cancelHideTrendPreview, handleCellMouseMove, handleSparklineMouseMove,
+                    filterCountry, filterLogistics, filterItemType, getStatusClass,
+                    searchType, searchQuery, // 搜索状态暴露
+                    sortField, sortOrder, sortByField,
+                    processedData, filteredAndSortedData, 
+                    currentPage, pageSize, totalPages, paginatedData,
+                    batchLogistics, batchType, applyBatchLogistics, applyBatchType,
+                    isAllSelected, toggleSelectAll, removeRow,
+                    handleSkuFileUpload, handleSkuFileDrop, clearSkuBaseData,
+                    handleSalesFileUpload, handleSalesFileDrop, handleInTransitFileUpload, exportExcel, resetSalesData,
+                    filterStatus, uniqueStatuses,
+                    filterNewProduct,
+                    getAmazonUrl,
+                    getWarehouseCostTooltip,
+                    formatSkuCost
+                };
+            }
+        });
+
+        app.directive('drag', {
+            mounted(el) {
+                const handle = el.querySelector('.drag-handle');
+                if (!handle) return;
+                
+                handle.style.cursor = 'grab';
+                let isDragging = false;
+                let startX, startY, initialLeft, initialTop;
+
+                handle.addEventListener('mousedown', (e) => {
+                    if(e.target.closest('button') || e.target.closest('input') || e.target.closest('label')) return; 
+
+                    isDragging = true;
+                    handle.style.cursor = 'grabbing';
+                    
+                    const rect = el.getBoundingClientRect();
+                    
+                    el.style.left = rect.left + 'px';
+                    el.style.top = rect.top + 'px';
+                    el.style.transform = 'none'; 
+                    el.style.bottom = 'auto';
+                    el.style.right = 'auto';
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    initialLeft = rect.left;
+                    initialTop = rect.top;
+
+                    const onMouseMove = (e) => {
+                        if (!isDragging) return;
+                        const dx = e.clientX - startX;
+                        const dy = e.clientY - startY;
+                        el.style.left = (initialLeft + dx) + 'px';
+                        el.style.top = (initialTop + dy) + 'px';
+                    };
+
+                    const onMouseUp = () => {
+                        isDragging = false;
+                        handle.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+            }
+        });
+        app.directive('resizable', {});
+        app.mount('#app');
+    </script>
+</body>
+</html>
