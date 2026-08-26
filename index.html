@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.3.6</title>
+    <title>智能补货辅助系统 v4.4.1</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 -->
@@ -440,6 +440,10 @@
                             <input type="checkbox" v-model="hideSafe" class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
                             <span class="text-sm font-medium text-slate-700">仅显示需补货 (隐藏安全库存)</span>
                         </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer bg-red-50 hover:bg-red-100 text-red-700 px-2.5 py-1 rounded-md border border-red-200 transition-colors text-xs font-bold shrink-0 select-none shadow-sm" title="一键过滤出所有触发亏本预警的商品">
+                            <input type="checkbox" :checked="filterLoss === 'loss'" @change="filterLoss = $event.target.checked ? 'loss' : ''" class="w-3.5 h-3.5 text-red-600 rounded border-red-300 focus:ring-red-500 cursor-pointer">
+                            <span>⚠️ 仅看亏本</span>
+                        </label>
                         
                         <!-- 新增：SKU/ASIN 智能搜索框 -->
                         <div class="flex items-center rounded-md shadow-sm border border-slate-300 bg-white overflow-hidden hover:border-blue-400 focus-within:border-blue-500 transition-colors h-8">
@@ -468,6 +472,10 @@
                             <option value="旺款">全部设为旺款</option>
                             <option value="平款">全部设为平款</option>
                         </select>
+                        <button @click="exportFilteredAllExcel" class="text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-medium py-1.5 px-3 rounded-md shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer shrink-0" title="导出当前列表筛选出的全部数据（包含无需补货的全部商品）">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            <span>下载筛选全部数据</span>
+                        </button>
                     </div>
                 </div>
 
@@ -475,102 +483,118 @@
                 <div class="table-container bg-white relative">
                     <table class="w-full text-left min-w-max border-separate border-spacing-0">
                         <thead>
-                            <tr class="text-slate-600 text-xs uppercase tracking-wider">
-                                <th class="sticky-header p-3 font-semibold text-center w-10 align-middle">
+                            <tr class="text-slate-600 text-[11px] uppercase tracking-tight">
+                                <th class="sticky-header p-1.5 font-semibold text-center w-8 min-w-[2rem] align-middle">
                                     <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected" class="rounded border-slate-300">
                                 </th>
                                 
-                                <th v-resizable data-col="sku" class="sticky-header p-2 font-semibold min-w-[6rem] align-middle relative group whitespace-nowrap">
-                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
-                                        <select v-model="filterNewProduct" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                <th v-resizable data-col="sku" class="sticky-header p-1 font-semibold min-w-[5.2rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-0.5">
+                                        <select v-model="filterNewProduct" class="appearance-none bg-transparent font-semibold text-slate-600 text-[11px] outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors pr-2">
                                             <option value="" class="text-slate-700">全部SKU</option>
-                                            <option value="new" class="text-green-600">🆕 新品</option>
+                                            <option value="new" class="text-green-600">🆕新品</option>
                                             <option value="old" class="text-slate-700">老品</option>
                                         </select>
-                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg class="w-2.5 h-2.5 text-slate-400 absolute right-0.5 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </th>
-                                <th class="sticky-header p-3 font-semibold w-16 align-middle text-center whitespace-nowrap">图片</th>
-                                <th class="sticky-header p-3 font-semibold min-w-[6rem] align-middle whitespace-nowrap">ASIN</th>
-                                <th v-resizable data-col="price" class="sticky-header p-3 font-semibold text-center min-w-[6rem] align-middle whitespace-nowrap">售价</th>
-                                <th v-resizable data-col="cost" class="sticky-header p-3 font-semibold text-center min-w-[6.5rem] align-middle whitespace-nowrap" title="根据国家与店铺智能匹配对应仓库成本，悬浮查看全仓明细">SKU成本</th>
+                                <th class="sticky-header p-1 font-semibold w-11 min-w-[2.8rem] align-middle text-center whitespace-nowrap">图片</th>
+                                <th class="sticky-header p-1 font-semibold min-w-[5.2rem] align-middle text-center whitespace-nowrap">ASIN</th>
                                 
-                                <th v-resizable data-col="status" class="sticky-header p-2 font-semibold text-center min-w-[6rem] align-middle relative group whitespace-nowrap">
-                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
-                                        <select v-model="filterStatus" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                <!-- 售价列：紧凑布局 + 独立防冒泡亏本筛选 + 价格排序 -->
+                                <th v-resizable data-col="price" class="sticky-header p-1 font-semibold text-center min-w-[5rem] align-middle relative group select-none whitespace-nowrap">
+                                    <div class="flex items-center justify-center gap-0.5 w-full">
+                                        <div @click="sortByField('price')" class="cursor-pointer hover:text-blue-600 flex items-center gap-0.5 text-[11px] text-slate-700 font-bold" title="点击按售价排序">
+                                            <span>售价</span>
+                                            <span class="text-slate-400 group-hover:text-blue-500 font-mono text-[9px]" :class="{'text-blue-600 font-bold': sortField === 'price'}">
+                                                {{ sortField === 'price' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}
+                                            </span>
+                                        </div>
+                                        <select v-model="filterLoss" @click.stop @change.stop class="text-[10px] bg-slate-100/90 hover:bg-blue-50 text-slate-600 rounded px-0.5 py-0.2 border border-slate-200 outline-none cursor-pointer font-medium transition-colors" :class="{'!bg-red-100 !text-red-700 !border-red-300 font-bold': filterLoss === 'loss', '!bg-blue-100 !text-blue-700 !border-blue-300': filterLoss === 'normal'}" title="筛选是否亏本">
+                                            <option value="" class="text-slate-700">全</option>
+                                            <option value="loss" class="text-red-600 font-bold">⚠️亏</option>
+                                            <option value="normal" class="text-slate-700">正</option>
+                                        </select>
+                                    </div>
+                                </th>
+                                
+                                <th v-resizable data-col="cost" class="sticky-header p-1 font-semibold text-center min-w-[5rem] align-middle whitespace-nowrap" title="根据国家与店铺智能匹配对应仓库成本，悬浮查看全仓明细">SKU成本</th>
+                                
+                                <th v-resizable data-col="status" class="sticky-header p-1 font-semibold text-center min-w-[4.8rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-0.5">
+                                        <select v-model="filterStatus" class="appearance-none bg-transparent font-semibold text-slate-600 text-[11px] outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors pr-2">
                                             <option value="" class="text-slate-700">全部状态</option>
                                             <option v-for="status in uniqueStatuses" :key="status" :value="status" class="text-slate-700">{{ status }}</option>
                                         </select>
-                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg class="w-2.5 h-2.5 text-slate-400 absolute right-0.5 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </th>
-                                <th class="sticky-header p-3 font-semibold min-w-[6rem] align-middle text-center whitespace-nowrap">分类标签</th>
+                                <th class="sticky-header p-1 font-semibold min-w-[4.5rem] align-middle text-center whitespace-nowrap">分类标签</th>
                                 
-                                <th class="sticky-header p-2 font-semibold text-center min-w-[5rem] align-middle relative group whitespace-nowrap">
-                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
-                                        <select v-model="filterCountry" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                <th class="sticky-header p-1 font-semibold text-center min-w-[4.5rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-0.5">
+                                        <select v-model="filterCountry" class="appearance-none bg-transparent font-semibold text-slate-600 text-[11px] outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors pr-2">
                                             <option value="" class="text-slate-700">全部区域</option>
                                             <option value="迪拜" class="text-slate-700">迪拜</option>
                                             <option value="沙特" class="text-slate-700">沙特</option>
                                             <option v-if="settings.showKsaCrossBorder" value="沙特(跨国)" class="text-slate-700">沙特(跨国)</option>
                                         </select>
-                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg class="w-2.5 h-2.5 text-slate-400 absolute right-0.5 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </th>
                                 
-                                <th class="sticky-header p-3 font-semibold text-center min-w-[6rem] cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle relative whitespace-nowrap" @click="sortByField('calculatedMonthlySales')" title="表格显示原月销，后台按您选择的算法重算日均">
-                                    <div class="flex items-center justify-center gap-1">
+                                <th class="sticky-header p-1 font-semibold text-center min-w-[4.6rem] cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle relative whitespace-nowrap" @click="sortByField('calculatedMonthlySales')" title="表格显示原月销，后台按您选择的算法重算日均">
+                                    <div class="flex items-center justify-center gap-0.5">
                                         近30天销
-                                        <span class="text-slate-400 group-hover:text-blue-500" :class="{'text-blue-600 font-bold': sortField === 'calculatedMonthlySales'}">
+                                        <span class="text-slate-400 group-hover:text-blue-500 font-mono text-[9px]" :class="{'text-blue-600 font-bold': sortField === 'calculatedMonthlySales'}">
                                             {{ sortField === 'calculatedMonthlySales' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}
                                         </span>
                                     </div>
                                 </th>
                                 
-                                <th class="sticky-header p-3 font-semibold text-center min-w-[5rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">FBA在售✎</th>
-                                <th class="sticky-header p-3 font-semibold text-center min-w-[5rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">采购在途✎</th>
+                                <th class="sticky-header p-1 font-semibold text-center min-w-[4.2rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">FBA在售✎</th>
+                                <th class="sticky-header p-1 font-semibold text-center min-w-[4.2rem] align-middle whitespace-nowrap" title="修改后按回车或点☑️确认">采购在途✎</th>
                                 
-                                <th v-resizable data-col="logistics" class="sticky-header p-2 font-semibold text-center min-w-[5.5rem] w-24 align-middle relative group whitespace-nowrap">
-                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
-                                        <select v-model="filterLogistics" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
+                                <th v-resizable data-col="logistics" class="sticky-header p-1 font-semibold text-center min-w-[4.8rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-0.5">
+                                        <select v-model="filterLogistics" class="appearance-none bg-transparent font-semibold text-slate-600 text-[11px] outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors pr-2">
                                             <option value="" class="text-slate-700">全部物流</option>
-                                            <option value="空运" class="text-slate-700">✈️ 空运</option>
-                                            <option value="海运" class="text-slate-700">🚢 海运</option>
-                                            <option value="空海结合" class="text-slate-700">✈️🚢 空海结合</option>
+                                            <option value="空运" class="text-slate-700">✈️空运</option>
+                                            <option value="海运" class="text-slate-700">🚢海运</option>
+                                            <option value="空海结合" class="text-slate-700">✈️🚢结合</option>
                                         </select>
-                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg class="w-2.5 h-2.5 text-slate-400 absolute right-0.5 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </th>
                                 
-                                <th v-resizable data-col="type" class="sticky-header p-2 font-semibold text-center min-w-[7rem] align-middle relative group whitespace-nowrap">
-                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-1">
-                                    <select v-model="filterItemType" class="appearance-none bg-transparent font-semibold text-slate-600 text-xs uppercase tracking-wider outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors">
-                                        <option value="" class="text-slate-700">全部款式</option>
-                                        <option value="爆款" class="text-slate-700">🔥 爆款</option>
-                                        <option value="旺款" class="text-slate-700">✨ 旺款</option>
-                                        <option value="平款" class="text-slate-700">📦 平款</option>
+                                <th v-resizable data-col="type" class="sticky-header p-1 font-semibold text-center min-w-[4.8rem] align-middle relative group whitespace-nowrap">
+                                    <div class="flex items-center justify-center relative w-full h-full cursor-pointer rounded hover:bg-slate-200/50 transition-colors p-0.5">
+                                        <select v-model="filterItemType" class="appearance-none bg-transparent font-semibold text-slate-600 text-[11px] outline-none cursor-pointer w-full text-center text-center-last relative z-10 hover:text-blue-600 transition-colors pr-2">
+                                            <option value="" class="text-slate-700">全部款式</option>
+                                            <option value="爆款" class="text-slate-700">🔥爆款</option>
+                                            <option value="旺款" class="text-slate-700">✨旺款</option>
+                                            <option value="平款" class="text-slate-700">📦平款</option>
                                         </select>
-                                        <svg class="w-3 h-3 text-slate-400 absolute right-1 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        <svg class="w-2.5 h-2.5 text-slate-400 absolute right-0.5 group-hover:text-blue-500 pointer-events-none z-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </th>
                                 
-                                <th v-resizable data-col="days" class="sticky-header p-3 font-semibold text-center min-w-[5rem] text-blue-600 align-middle whitespace-nowrap">预计可售天数</th>
+                                <th v-resizable data-col="days" class="sticky-header p-1 font-semibold text-center min-w-[4.4rem] text-blue-600 align-middle whitespace-nowrap">可售天数</th>
                                 
-                                <th v-resizable data-col="restock" class="sticky-header p-3 font-semibold text-center min-w-[6rem] text-emerald-600 cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle whitespace-nowrap" @click="sortByField('suggestedRestock')" title="点击排序">
-                                    <div class="flex items-center justify-center gap-1">
-                                        建议补货量
-                                        <span class="text-slate-400 group-hover:text-emerald-500" :class="{'text-emerald-600 font-bold': sortField === 'suggestedRestock'}">
+                                <th v-resizable data-col="restock" class="sticky-header p-1 font-semibold text-center min-w-[4.8rem] text-emerald-600 cursor-pointer hover:bg-slate-200/80 transition-colors rounded select-none group align-middle whitespace-nowrap" @click="sortByField('suggestedRestock')" title="点击排序">
+                                    <div class="flex items-center justify-center gap-0.5">
+                                        建议补货
+                                        <span class="text-slate-400 group-hover:text-emerald-500 font-mono text-[9px]" :class="{'text-emerald-600 font-bold': sortField === 'suggestedRestock'}">
                                             {{ sortField === 'suggestedRestock' ? (sortOrder === 'desc' ? '↓' : '↑') : '↕' }}
                                         </span>
                                     </div>
                                 </th>
 
-                                <!-- 新增：实际补货量输入列 -->
-                                <th v-resizable data-col="actual" class="sticky-header p-3 font-semibold text-center min-w-[6rem] text-indigo-600 align-middle whitespace-nowrap" title="运营实际落地的采购数量，可导出">实际补货量</th>
+                                <th v-resizable data-col="actual" class="sticky-header p-1 font-semibold text-center min-w-[4.8rem] text-indigo-600 align-middle whitespace-nowrap" title="运营实际落地的采购数量，可导出">实际补货</th>
                                 
-                                <th v-resizable data-col="trend" class="sticky-header p-3 font-semibold text-center min-w-[8rem] align-middle text-slate-500 whitespace-nowrap">30天趋势</th>
+                                <th v-resizable data-col="trend" class="sticky-header p-1 font-semibold text-center min-w-[6.5rem] align-middle text-slate-500 whitespace-nowrap">30天趋势</th>
                                 
-                                <th class="sticky-header p-3 font-semibold text-center w-16 align-middle text-red-400 whitespace-nowrap">操作</th>
+                                <th class="sticky-header p-1 font-semibold text-center w-10 min-w-[2.5rem] align-middle text-red-400 whitespace-nowrap">操作</th>
                             </tr>
                         </thead>
                         
@@ -579,11 +603,11 @@
                                 class="hover:bg-blue-50/40 transition-colors"
                                 :class="{'bg-red-50/50': item.suggestedRestock > 0 && !item.isOosOptimized, 'bg-amber-50/70': item.isOosOptimized && item.suggestedRestock > 0, 'opacity-75': item.suggestedRestock === 0}">
                                 
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <input type="checkbox" v-model="item.selected" class="rounded border-slate-300">
                                 </td>
                                 
-                                <td class="p-3 text-sm font-medium text-slate-800 break-all align-middle border-b border-slate-100" :title="'品名: ' + (item.name || '-') + '\nSKU: ' + (item.sku || '-') + '\nMSKU: ' + (item.msku || '-')">
+                                <td class="p-1.5 text-sm font-medium text-slate-800 break-all align-middle border-b border-slate-100" :title="'品名: ' + (item.name || '-') + '\nSKU: ' + (item.sku || '-') + '\nMSKU: ' + (item.msku || '-')">
                                     <div class="relative inline-block cursor-help">
                                         <span class="hover:text-blue-600 transition-colors">{{ item.sku || '-' }}</span>
                                         <span v-if="item.isNewProduct" class="absolute -top-2 -right-5 bg-green-500 text-white text-[9px] px-1 rounded-sm font-bold shadow-sm select-none z-10 whitespace-nowrap">新</span>
@@ -598,7 +622,7 @@
                                     <div v-if="!item.skuImage" class="w-10 h-10 aspect-square bg-slate-100 rounded border border-slate-200 mx-auto flex items-center justify-center text-[8px] text-slate-400">无图</div>
                                 </td>
                                 
-                                <td class="p-3 text-xs align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-xs align-middle border-b border-slate-100">
                                   <a v-if="item.asin" 
                                      :href="getAmazonUrl(item.asin, item.country)" 
                                      target="_blank" 
@@ -610,7 +634,7 @@
                               </td>
 
                                 <!-- 新增：售价列与亏本预警 -->
-                                <td class="p-3 text-center align-middle border-b border-slate-100 whitespace-nowrap">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100 whitespace-nowrap">
                                     <div v-if="item.price !== null" class="flex flex-col items-center justify-center">
                                         <span class="font-bold text-slate-800 text-sm">¥{{ item.price.toFixed(2) }}</span>
                                         <div v-if="item.lossWarning && item.lossWarning.isLoss" class="mt-0.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 cursor-help" title="⚠️ 留意是否亏本">
@@ -621,7 +645,7 @@
                                 </td>
 
                                 <!-- 新增：SKU成本列与多仓成本悬浮 -->
-                                <td class="p-3 text-center align-middle border-b border-slate-100 whitespace-nowrap">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100 whitespace-nowrap">
                                     <div v-if="item.skuCost !== null" class="flex flex-col items-center justify-center cursor-help group" :title="getWarehouseCostTooltip(item)">
                                         <span class="font-bold text-indigo-700 text-sm hover:underline">¥{{ formatSkuCost(item.skuCost) }}</span>
                                         <span class="text-[10px] text-slate-400 flex items-center gap-0.5">
@@ -632,13 +656,13 @@
                                     <span v-else class="text-slate-400 font-mono">-</span>
                                 </td>
                                 
-                                <td class="p-3 text-center text-xs font-medium align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center text-xs font-medium align-middle border-b border-slate-100">
                                     <span v-if="item.skuStatus" class="px-2 py-1 rounded border inline-block whitespace-nowrap" :class="getStatusClass(item.skuStatus)">
                                         {{ item.skuStatus }}
                                     </span>
                                     <span v-else class="text-slate-300">-</span>
                                 </td>
-                                <td class="p-3 text-center align-middle text-[10px] border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle text-[10px] border-b border-slate-100">
                                     <div v-if="item.skuCategory" class="flex flex-wrap justify-center gap-1">
                                         <span v-for="cat in item.skuCategory.split(', ')" :key="cat" class="bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
                                             {{ cat }}
@@ -647,13 +671,13 @@
                                     <span v-else class="text-slate-300">-</span>
                                 </td>
 
-                                <td class="p-3 text-sm font-semibold text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-sm font-semibold text-center align-middle border-b border-slate-100">
                                     <span :class="item.country === '迪拜' ? 'text-indigo-600' : (item.country === '沙特(跨国)' ? 'text-purple-600' : 'text-amber-600')" :title="item.store">
                                         {{ item.country }}
                                     </span>
                                 </td>
                                 
-                                <td class="p-3 text-center text-sm font-medium cursor-help group relative align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center text-sm font-medium cursor-help group relative align-middle border-b border-slate-100">
                                     <span class="border-b border-dashed border-slate-400 pb-0.5">
                                         {{ Math.round(item.calculatedMonthlySales) }}
                                     </span>
@@ -662,7 +686,7 @@
                                     </span>
                                 </td>
                                 
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <div class="flex items-center justify-center">
                                         <input type="number" v-model.number="item.tempFbaStock" @keyup.enter="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock" class="editable-input text-sm text-slate-700 w-16">
                                         <div class="w-6 flex justify-center shrink-0">
@@ -670,7 +694,7 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <div class="flex items-center justify-center">
                                         <input type="number" v-model.number="item.tempOnTheWay" @keyup.enter="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay" class="editable-input text-sm text-slate-700 placeholder-slate-300 w-16" placeholder="填数量">
                                         <div class="w-6 flex justify-center shrink-0">
@@ -702,7 +726,7 @@
                                         </button>
                                     </div>
                                 </td>
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <select v-model="item.itemType" class="editable-input text-xs cursor-pointer hover:border-blue-400">
                                         <option value="爆款">🔥 爆款</option>
                                         <option value="旺款">✨ 旺款</option>
@@ -710,11 +734,11 @@
                                     </select>
                                 </td>
 
-                                <td class="p-3 text-center font-bold align-middle border-b border-slate-100" :class="item.availableDays < item.triggerDays ? 'text-red-500' : 'text-green-600'">
+                                <td class="p-1.5 text-center font-bold align-middle border-b border-slate-100" :class="item.availableDays < item.triggerDays ? 'text-red-500' : 'text-green-600'">
                                     {{ item.availableDays === Infinity ? '999+' : item.availableDays.toFixed(1) }}天
                                     <div class="text-[10px] text-slate-400 font-normal">阈值:{{ item.triggerDays }}天</div>
                                 </td>
-                                <td class="p-3 text-center font-bold text-lg cursor-help group relative align-middle border-b border-slate-100" :title="item.restockTooltip">
+                                <td class="p-1.5 text-center font-bold text-lg cursor-help group relative align-middle border-b border-slate-100" :title="item.restockTooltip">
                                     <div class="flex items-center justify-center gap-1.5 border-b border-dashed border-transparent hover:border-slate-400 pb-0.5">
                                         <span v-if="item.isOosOptimized" class="text-[10px] bg-red-100 border border-red-200 text-red-600 px-1 py-0.5 rounded shadow-sm leading-none shrink-0" title="已触发断货补货特殊优化">断货</span>
                                         <span :class="item.suggestedRestock > 0 ? (item.isOosOptimized ? 'text-orange-600' : 'text-emerald-600') : 'text-slate-400'">
@@ -727,11 +751,11 @@
                                 </td>
                                 
                                 <!-- 新增：实际补货量 -->
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <input type="number" v-model.number="item.actualRestock" class="editable-input text-sm text-indigo-700 font-bold bg-indigo-50/50 w-20 shadow-inner" placeholder="填入数量">
                                 </td>
 
-                                <td class="p-3 text-center align-middle border-b border-slate-100"
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100"
                                     @mouseenter="showTrendPreview($event, item)"
                                     @mousemove="handleCellMouseMove($event, item)"
                                     @mouseleave="hideTrendPreview">
@@ -772,7 +796,7 @@
                                     </div>
                                 </td>
                                 
-                                <td class="p-3 text-center align-middle border-b border-slate-100">
+                                <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <button @click="removeRow(item)" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="移除此行数据">
                                         <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     </button>
@@ -1073,7 +1097,7 @@
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.3.6';
+        const CURRENT_VERSION = '4.4.1';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1325,6 +1349,7 @@
                 const filterItemType = ref('');
                 const filterStatus = ref('');
                 const filterNewProduct = ref('');
+                const filterLoss = ref(''); // 售价/亏本筛选状态 (v4.3.7)
 
                 // 新增搜素状态
                 const searchType = ref('sku');
@@ -1673,7 +1698,8 @@
                 // ---------------------------------
 
 
-                watch([filterCountry, filterLogistics, filterItemType, filterStatus, filterNewProduct, sortField, sortOrder, hideSafe, searchQuery, searchType], () => {
+                watch([filterCountry, filterLogistics, filterItemType, filterStatus, filterNewProduct,
+                    filterLoss, sortField, sortOrder, hideSafe, searchQuery, searchType], () => {
                     currentPage.value = 1;
                 });
 
@@ -2245,12 +2271,28 @@ const processInTransitData = (data) => {
                             if (targetWh && warehouseCosts[targetWh] !== undefined && warehouseCosts[targetWh] > 0) {
                                 cost = warehouseCosts[targetWh];
                             } else {
-                                // 匹配不到直接显示深圳仓成本
-                                if (warehouseCosts['深圳仓'] !== undefined && warehouseCosts['深圳仓'] > 0) {
+                                // 1. 对应国家的 FBA 仓与 SF 仓候选定义
+                                const fbaWh = isDubai ? '迪拜FBA仓' : (isSaudi ? '沙特FBA仓' : '');
+                                const sfCandidates = isDubai ? ['迪拜W18-SF仓'] : (isSaudi ? ['沙特YB-SF仓', '沙特老-SF仓'] : []);
+
+                                // 2. 若为 SF 模式且 SF 目标仓无成本，优先借用对应国家的 FBA 仓
+                                if (isSF && fbaWh && warehouseCosts[fbaWh] !== undefined && warehouseCosts[fbaWh] > 0) {
+                                    cost = warehouseCosts[fbaWh];
+                                    usedWarehouse = fbaWh;
+                                    isFallback = true;
+                                } else if (!isSF && sfCandidates.length > 0 && sfCandidates.some(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0)) {
+                                    // 3. 新增：若为 FBA 模式且 FBA 目标仓无成本，优先借用对应国家的 SF 仓
+                                    const hitSfWh = sfCandidates.find(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0);
+                                    cost = warehouseCosts[hitSfWh];
+                                    usedWarehouse = hitSfWh;
+                                    isFallback = true;
+                                } else if (warehouseCosts['深圳仓'] !== undefined && warehouseCosts['深圳仓'] > 0) {
+                                    // 4. 深圳仓保底
                                     cost = warehouseCosts['深圳仓'];
                                     usedWarehouse = '深圳仓';
                                     isFallback = true;
                                 } else {
+                                    // 5. 该 SKU 名下任意有效仓保底
                                     const validWhKeys = Object.keys(warehouseCosts);
                                     if (validWhKeys.length > 0) {
                                         usedWarehouse = validWhKeys[0];
@@ -2671,6 +2713,9 @@ const processInTransitData = (data) => {
                             valA = a.calculatedMonthlySales; valB = b.calculatedMonthlySales;
                         } else if (field === 'suggestedRestock') {
                             valA = a.suggestedRestock; valB = b.suggestedRestock;
+                        } else if (field === 'price') {
+                            valA = (a.price !== null && a.price !== undefined && !isNaN(a.price)) ? a.price : (sortOrder.value === 'desc' ? -999999 : 999999);
+                            valB = (b.price !== null && b.price !== undefined && !isNaN(b.price)) ? b.price : (sortOrder.value === 'desc' ? -999999 : 999999);
                         }
 
                         if (sortOrder.value === 'desc') return valB - valA;
@@ -2692,6 +2737,16 @@ const processInTransitData = (data) => {
                     if (filterStatus.value) result = result.filter(item => item.skuStatus === filterStatus.value);
                     if (filterNewProduct.value === 'new') result = result.filter(item => item.isNewProduct);
                     if (filterNewProduct.value === 'old') result = result.filter(item => !item.isNewProduct);
+                    if (filterLoss.value === 'loss') {
+                        result = result.filter(item => {
+                            return Boolean(item.lossWarning && item.lossWarning.isLoss === true);
+                        });
+                    } else if (filterLoss.value === 'normal') {
+                        result = result.filter(item => {
+                            const isLoss = Boolean(item.lossWarning && item.lossWarning.isLoss === true);
+                            return !isLoss;
+                        });
+                    }
                     
                     // 新增：搜索过滤
                     if (searchQuery.value) {
@@ -2752,6 +2807,87 @@ const processInTransitData = (data) => {
                     });
                     batchType.value = '';
                 };
+
+const exportFilteredAllExcel = () => {
+    const dataToExport = [];
+    // 遍历当前筛选出来的全部数据（不过滤 suggestedRestock > 0）
+    filteredAndSortedData.value.forEach(item => {
+        if (item.logistics === '空海结合') {
+            const airRatio = settings.value.airSeaRatio / 100;
+            const airRestockQty = Math.round((item.suggestedRestock || 0) * airRatio);
+            const seaRestockQty = (item.suggestedRestock || 0) - airRestockQty;
+
+            let airActualQty = '', seaActualQty = '';
+            if (item.actualRestock !== '' && item.actualRestock !== null && !isNaN(item.actualRestock)) {
+                airActualQty = Math.round(item.actualRestock * airRatio);
+                seaActualQty = item.actualRestock - airActualQty;
+            }
+
+            dataToExport.push({
+                "MSKU": item.msku,
+                "SKU": item.sku,
+                "ASIN": item.asin,
+                "店铺": item.store,
+                "国家": item.country,
+                "售价": item.price !== null ? item.price : '-',
+                "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                "建议补货数量": airRestockQty,
+                "实际补货量": airActualQty,
+                "运输方式": "空运",
+                "商品属性": item.itemType,
+                "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                "最后备注": "空海结合" 
+            });
+
+            dataToExport.push({
+                "MSKU": item.msku,
+                "SKU": item.sku,
+                "ASIN": item.asin,
+                "店铺": item.store,
+                "国家": item.country,
+                "售价": item.price !== null ? item.price : '-',
+                "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                "建议补货数量": seaRestockQty,
+                "实际补货量": seaActualQty,
+                "运输方式": "海运",
+                "商品属性": item.itemType,
+                "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                "最后备注": "空海结合" 
+            });
+        } else {
+            dataToExport.push({
+                "MSKU": item.msku,
+                "SKU": item.sku,
+                "ASIN": item.asin,
+                "店铺": item.store,
+                "国家": item.country,
+                "售价": item.price !== null ? item.price : '-',
+                "SKU成本": item.skuCost !== null ? item.skuCost : '-',
+                "成本匹配仓库": item.matchedCostInfo ? item.matchedCostInfo.usedWarehouse : '-',
+                "建议补货数量": item.suggestedRestock,
+                "实际补货量": (item.actualRestock !== '' && item.actualRestock !== null) ? item.actualRestock : '',
+                "运输方式": item.logistics,
+                "商品属性": item.itemType,
+                "亏本风险": item.lossWarning && item.lossWarning.isLoss ? '是' : '否',
+                "最后备注": ""
+            });
+        }
+    });
+
+    if (dataToExport.length === 0) {
+        alert("当前筛选条件下没有数据记录！");
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "全量筛选数据");
+
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(workbook, `补货全量筛选表_${date}.xlsx`);
+};
 
 const exportExcel = () => {
     const dataToExport = [];
@@ -2876,7 +3012,17 @@ const exportExcel = () => {
                     if (!info || !info.allCosts || Object.keys(info.allCosts).length === 0) {
                         return "暂无各仓库成本数据";
                     }
-                    let str = `【当前匹配】${info.usedWarehouse}: ¥${info.cost ? formatSkuCost(info.cost) : '-'}\n(所属类型: ${info.costType}成本${info.isFallback ? '，源自深圳仓保底' : ''})\n====================\n【该 SKU 所有仓库成本清单】\n`;
+                    let fallbackNote = '';
+                    if (info.isFallback) {
+                        if (info.usedWarehouse && info.usedWarehouse.includes('FBA') && info.costType === 'SF') {
+                            fallbackNote = '，SF仓无成本借用FBA仓';
+                        } else if (info.usedWarehouse && info.usedWarehouse.includes('SF') && info.costType === 'FBA') {
+                            fallbackNote = '，FBA仓无成本借用SF仓';
+                        } else {
+                            fallbackNote = `，源自${info.usedWarehouse}保底`;
+                        }
+                    }
+                    let str = `【当前匹配】${info.usedWarehouse}: ¥${info.cost ? formatSkuCost(info.cost) : '-'}\n(所属类型: ${info.costType}成本${fallbackNote})\n====================\n【该 SKU 所有仓库成本清单】\n`;
                     for (let wh in info.allCosts) {
                         const marker = wh === info.usedWarehouse ? '👉 ' : '   ';
                         str += `${marker}${wh}: ¥${formatSkuCost(info.allCosts[wh])}\n`;
@@ -2888,6 +3034,7 @@ const exportExcel = () => {
 
                 return {
                     CURRENT_VERSION,
+                    filterLoss,
                     updateInfo,
                     showUpdateModal,
                     isCheckingUpdate,
@@ -2909,7 +3056,8 @@ const exportExcel = () => {
                     batchLogistics, batchType, applyBatchLogistics, applyBatchType,
                     isAllSelected, toggleSelectAll, removeRow,
                     handleSkuFileUpload, handleSkuFileDrop, clearSkuBaseData,
-                    handleSalesFileUpload, handleSalesFileDrop, handleInTransitFileUpload, exportExcel, resetSalesData,
+                    handleSalesFileUpload, handleSalesFileDrop, handleInTransitFileUpload, exportExcel,
+                    exportFilteredAllExcel, resetSalesData,
                     filterStatus, uniqueStatuses,
                     filterNewProduct,
                     getAmazonUrl,
