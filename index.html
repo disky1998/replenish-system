@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.4.1</title>
+    <title>智能补货辅助系统 v4.4.2</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 -->
@@ -1097,7 +1097,7 @@
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.4.1';
+        const CURRENT_VERSION = '4.4.2';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1417,12 +1417,13 @@
                     }, 150);
                 };
 
-                // 全局单例高清趋势卡片状态 (零卡顿 120 FPS 渲染架构)
+                // 全局单例高清趋势卡片状态 (零卡顿 120 FPS 渲染架构 + Hover Intent 停留延迟防误触)
                 const trendTooltipItem = ref(null);
                 const trendTooltipVisible = ref(false);
                 const trendTooltipPos = ref({ top: '0px', left: '0px' });
                 const trendHoverPoint = ref(null);
                 let hideTrendTooltipTimeout = null;
+                let showTrendTooltipTimeout = null; // 停留延迟防抖定时器
 
                 const cancelHideTrendPreview = () => {
                     if (hideTrendTooltipTimeout) {
@@ -1431,9 +1432,15 @@
                     }
                 };
 
-                const showTrendPreview = (e, item) => {
+                const cancelShowTrendPreview = () => {
+                    if (showTrendTooltipTimeout) {
+                        clearTimeout(showTrendTooltipTimeout);
+                        showTrendTooltipTimeout = null;
+                    }
+                };
+
+                const triggerShowTrend = (targetEl, item) => {
                     if (!item) return;
-                    cancelHideTrendPreview();
                     trendTooltipItem.value = item;
 
                     // 默认显示最近一天的具体数据
@@ -1448,8 +1455,7 @@
                         trendHoverPoint.value = null;
                     }
 
-                    const target = e.currentTarget || e.target;
-                    const rect = target.getBoundingClientRect();
+                    const rect = targetEl.getBoundingClientRect();
                     const tooltipWidth = 320;
                     const tooltipHeight = 180;
 
@@ -1475,22 +1481,40 @@
                     trendTooltipVisible.value = true;
                 };
 
+                // 鼠标移入趋势图单元格：引入 280ms 停留延迟，纯路过去点击后面按键时绝不误弹
+                const showTrendPreview = (e, item) => {
+                    if (!item) return;
+                    cancelHideTrendPreview();
+                    cancelShowTrendPreview();
+
+                    const target = e.currentTarget || e.target;
+                    // 若当前已在显示其他趋势卡片，则即时切换；若未显示则需停留 280ms 才触发展示
+                    if (trendTooltipVisible.value) {
+                        triggerShowTrend(target, item);
+                    } else {
+                        showTrendTooltipTimeout = setTimeout(() => {
+                            triggerShowTrend(target, item);
+                        }, 280);
+                    }
+                };
+
                 const hideTrendPreview = () => {
+                    cancelShowTrendPreview(); // 第一时间取消未触发的展示定时器
                     cancelHideTrendPreview();
                     hideTrendTooltipTimeout = setTimeout(() => {
                         trendTooltipVisible.value = false;
                         trendTooltipItem.value = null;
                         trendHoverPoint.value = null;
-                    }, 250);
+                    }, 150);
                 };
 
-                // 用户在表格单元格上直接滑动时，实时联动更新浮窗内的日期和销量
+                // 用户在表格单元格上滑动时，仅在卡片已显示时实时联动
                 const handleCellMouseMove = (e, item) => {
                     if (!item || !item.salesTrend || item.salesTrend.length === 0) return;
-                    if (!trendTooltipVisible.value || trendTooltipItem.value !== item) {
-                        showTrendPreview(e, item);
-                    }
                     cancelHideTrendPreview();
+                    if (!trendTooltipVisible.value || trendTooltipItem.value !== item) {
+                        return;
+                    }
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const pct = Math.max(0, Math.min(1, x / rect.width));
