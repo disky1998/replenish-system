@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.4.2</title>
+    <title>智能补货辅助系统 v4.4.3</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 -->
@@ -1097,7 +1097,7 @@
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.4.2';
+        const CURRENT_VERSION = '4.4.3';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1866,26 +1866,35 @@ const processInTransitData = (data) => {
                         }
                         
                         // 定位核心列
-                        let statusKey = Object.keys(row).find(k => k.includes('状态') || k.includes('STATUS'));
-                        let skuKey = Object.keys(row).find(k => k === 'SKU' && !k.includes('MSKU'));
-                        let storeKey = Object.keys(row).find(k => k.includes('店铺') || k.includes('STORE'));
-                        let qtyKey = Object.keys(row).find(k => k.includes('采购数量') || k.includes('QTY') || k.includes('数量'));
+                        const statusKey = Object.keys(row).find(k => k.includes('状态') || k.includes('STATUS'));
+                        const skuKey = Object.keys(row).find(k => (k === 'SKU' || k.includes('SKU')) && !k.includes('MSKU') && !k.includes('FNSKU')) || Object.keys(row).find(k => k === 'SKU');
+                        const storeKey = Object.keys(row).find(k => k.includes('店铺') || k.includes('STORE'));
+                        
+                        // 精准识别「采购数量」与「核对数量」
+                        const purchaseQtyKey = Object.keys(row).find(k => k.includes('采购数量') || k.includes('采购数')) || Object.keys(row).find(k => (k.includes('数量') || k.includes('QTY')) && !k.includes('核对'));
+                        const checkQtyKey = Object.keys(row).find(k => k.includes('核对数量') || k.includes('核对数') || k.includes('已核对') || k.includes('CHECKQTY'));
 
-                        // 缺少任何核心列则跳过该行
-                        if (!statusKey || !skuKey || !storeKey || !qtyKey) return;
+                        // 缺少任何必要列则跳过该行
+                        if (!statusKey || !skuKey || !storeKey || !purchaseQtyKey) return;
 
-                        // 逻辑 1：只识别 已签收 + 待签收
+                        // 逻辑 1：状态过滤保留「待签收」、「已签收」以及「部分核对」
                         const status = String(row[statusKey] || '').trim();
-                        if (!status.includes('待签收') && !status.includes('已签收')) return;
+                        const isStatusValid = status.includes('待签收') || status.includes('已签收') || status.includes('部分核对');
+                        if (!isStatusValid) return;
+
+                        // 逻辑 2：数量计算统一采用「采购数量」-「核对数量」
+                        const purchaseQty = parseInt(row[purchaseQtyKey]) || 0;
+                        const checkQty = checkQtyKey ? (parseInt(row[checkQtyKey]) || 0) : 0;
+                        const inQty = purchaseQty - checkQty;
 
                         // 提取基础数据并全转大写防呆
                         const inSku = String(row[skuKey] || '').replace(/[\t\n\r]/g, '').trim().toUpperCase();
                         const inStore = String(row[storeKey] || '').toUpperCase();
-                        const inQty = parseInt(row[qtyKey]) || 0;
 
-                        if (inQty === 0 || !inSku) return;
+                        // 差额小于等于0表示已全额核对完毕，不再属于在途
+                        if (inQty <= 0 || !inSku) return;
 
-                        // 逻辑 2：表格里的店铺名 包含 KSA 对应沙特，包含 UAE 对应迪拜
+                        // 逻辑 3：表格里的店铺名 包含 KSA 对应沙特，包含 UAE 对应迪拜
                         let inCountry = '';
                         if (inStore.includes('KSA')) {
                             inCountry = '沙特';
@@ -1895,7 +1904,7 @@ const processInTransitData = (data) => {
                             return; // 既没KSA也没UAE，说明不是目标区域的数据，直接跳过
                         }
 
-                        // 逻辑 3：匹配 SKU/MSKU + 国家，条件相同的在途直接合并（累加）
+                        // 逻辑 4：匹配 SKU/MSKU + 国家，条件相同的在途直接合并（累加）
                         const target = processedData.value.find(item => {
                             // 原表格可能有多店铺聚合，SKU/MSKU是用逗号隔开的，拆开匹配
                             const itemSkus = [];
@@ -1923,9 +1932,9 @@ const processInTransitData = (data) => {
                     });
 
                     if (matchCount > 0) {
-                        alert(`本地在途导入完成！\n成功合并匹配 ${matchCount} 条记录，合计增加了 ${addedQty} 个在途库存。`);
+                        alert(`本地在途导入完成！\n成功合并匹配 ${matchCount} 条记录，按「采购数量 - 核对数量」合计增加了 ${addedQty} 个在途库存。`);
                     } else {
-                        alert("导入完成，但未能成功叠加。\n请检查：\n1. 状态是否为「待签收/已签收」\n2. 店铺名列是否带有 KSA 或 UAE\n3. SKU是否与底表一致");
+                        alert("导入完成，但未能成功叠加。\n请检查：\n1. 状态是否包含「待签收 / 已签收 / 部分核对」\n2. 店铺名列是否带有 KSA 或 UAE\n3. 采购数量减去核对数量是否大于 0\n4. SKU 是否与底表一致");
                     }
                 };
 
