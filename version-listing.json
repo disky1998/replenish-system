@@ -1,6 +1,6 @@
 {
   "latest_version": "2.9.1",
-  "new_version_url": "https://share.gemini.google/OaAJ7wvPzA4o",
-  "release_notes": "1、竞品抓取全面升级：深度适配亚马逊7.27新规（75字符短标题+五大亮点+249字节搜索词），内置单HTML纯前端极速源码解析；2、新增AI批量重构优化与新规字段一键导出Excel；3、新增高级A+全景编辑与普通A+转高级A+页面；4、图片设计师与批量编辑功能全新升级",
+  "new_version_url": "https://share.gemini.google/w7PRsNJEV6k6",
+  "release_notes": "1、竞品抓取全面升级：深度适配亚马逊7.27新规（75字符短标题+五大亮点+249字节搜索词），内置单HTML纯前端极速源码解析；2、新增AI批量重构优化与新规字段一键导出Excel",
   "mandatory": false
 }
