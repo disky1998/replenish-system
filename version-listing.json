@@ -1,6 +1,6 @@
 {
   "latest_version": "2.9.4",
-  "new_version_url": "https://share.gemini.google/w7PRsNJEV6k6",
+  "new_version_url": "https://share.gemini.google/s5DveiZS9fUc",
   "release_notes": "1、高级A+全能套件新增【1688详情转化模式】：支持任意分辨率切片等比无损拼接，智能提取中文图文并自动转译纯英文，中国模特自动换欧美模特，严禁宗教与猪相关图文；2、竞品抓取全面升级：深度适配亚马逊7.27新规（75字符短标题+五大亮点+249字节搜索词），内置单HTML纯前端极速源码解析与Excel导出",
   "mandatory": false
 }
