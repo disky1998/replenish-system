@@ -1,6 +1,6 @@
 {
-  "latest_version": "2.9.6",
-  "new_version_url": "https://share.gemini.google/03OmlVhJO8Jm",
-  "release_notes": "1、图片橡皮擦全面升级：支持原位中心等比3倍出框超清放大，卡片纯净无冗余文字标签；2、高级A+全能套件新增【1688详情转化模式】：支持任意分辨率切片等比无损拼接，智能提取中文图文并自动转译纯英文，中国模特自动换欧美模特；3、竞品抓取全面升级",
+  "latest_version": "2.9.8",
+  "new_version_url": "https://share.gemini.google/2tN9Wl2P2bfW",
+  "release_notes": "1、图片设计排版系统全面升级：彻底消除Body 55px/Montserrat/色值等样式参数泄漏，升级为纯视觉语义排版描述体系并增加底层防泄漏拦截；2、模特人像规范升级：女模严格限定欧美白人绝不包头巾，男模支持中东/欧美现代休闲装（严禁白大褂长袍与头巾）；3、原图对比悬停放大全新优化：支持500px超清大图零剪裁实时比对；4、图片橡皮擦支持3倍超清出框放大",
   "mandatory": false
 }
