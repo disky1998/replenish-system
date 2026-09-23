@@ -2,7 +2,7 @@
   "latest_version": "3.2.1",
   "version_name": "VER 3.2.1 · 局部重塑画板版",
   "update_time": "2026-09-23",
-  "new_version_url": "https://share.gemini.google/FI4xqAtWmPQN",
-  "release_notes": "1、画板代码雨动画升级：仅覆盖用户涂抹或框选区域，绝不覆盖扩展上下文区域，完美支持不规则形状遮罩，纯净无遮挡文字；2、涂抹笔刷像素默认值调整为 100px；3、全面支持参考图拖拽导入与点击上传；4、新增单图多维度非文字动画操作指引（缩放拓展与双击重构修改）；5、版本升级至 VER 3.2.1 并全网同步",
+  "new_version_url": "https://share.gemini.google/dkeS9BibiyId",
+  "release_notes": "1、图片编辑新增局部编辑功能；2、局部编辑页面可单图导入可多涂导入，多图导入时可针对单一图片执行拖动、缩放、AI重绘",
   "mandatory": false
 }
