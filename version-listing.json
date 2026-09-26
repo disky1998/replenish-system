@@ -2,7 +2,7 @@
   "latest_version": "3.3.5",
   "version_name": "VER 3.3.5 · 高级A+双引擎极速版",
   "update_time": "2026-09-26",
-  "new_version_url": "https://share.gemini.google/hjCHTWgZYw07",
+  "new_version_url": "https://share.gemini.google/xVd9VeFQBzdY",
   "release_notes": "1、高级A+全能套件全面升级双引擎（全景通栏长图生成 + 独立单张切片生成）；2、图片生成支持3进程并发处理，单一切片异常隔离并可直接单屏重试；3、UI界面轻量精简，移除冗余繁琐说明。",
   "mandatory": false
 }
