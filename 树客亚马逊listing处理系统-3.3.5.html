@@ -4096,12 +4096,17 @@
             },
 
             // 动态进度控制
+            showProgress(mode) {
+                const box = document.getElementById(`paplus-${mode}-progress-box`);
+                if (box) box.classList.remove('hidden');
+            },
+
             updateProgress(mode, current, total, text) {
                 const box = document.getElementById(`paplus-${mode}-progress-box`);
                 const bar = document.getElementById(`paplus-${mode}-progress-bar`);
                 const txt = document.getElementById(`paplus-${mode}-progress-text`);
                 if (box) box.classList.remove('hidden');
-                const pct = Math.min(100, Math.round((current / total) * 100));
+                const pct = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
                 if (bar) bar.style.width = `${pct}%`;
                 if (txt) txt.innerHTML = `<div class="loader !w-3.5 !h-3.5 mr-1.5 inline-block align-middle"></div> [${current}/${total}] ${text}`;
             },
@@ -4109,6 +4114,10 @@
             hideProgress(mode) {
                 const box = document.getElementById(`paplus-${mode}-progress-box`);
                 if (box) box.classList.add('hidden');
+            },
+
+            async createMobileFallback(desktopUrl) {
+                return await this.cropDesktopToMobileSlice(desktopUrl);
             },
 
             // 更新结果区模式标识徽章
@@ -6177,26 +6186,28 @@ ${prompt && prompt !== sectionPrompt ? '\nOVERALL BLUEPRINT CONTEXT:\n' + prompt
                     }
                 }
 
+                let aiError = null;
                 try {
                     const response = await fetchWithRetry(IMAGE_API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"] } })
-                    });
+                    }, 2);
                     const data = await response.json();
                     const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
                     if (part) {
                         const resultUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                         return await this.fitImageToCanvas(resultUrl, 1464, 600);
                     }
+                    if (data.error) {
+                        aiError = new Error(data.error.message || 'API返回错误');
+                    }
                 } catch (e) {
                     console.warn(`Single desktop slice generation failed for slice #${sliceIndex + 1}:`, e);
+                    aiError = e;
                 }
 
-                if (sourceDataUrl) {
-                    return await this.fitImageToCanvas(sourceDataUrl, 1464, 600);
-                }
-                throw new Error(`未能生成第 ${sliceIndex + 1} 屏切片`);
+                throw new Error(aiError?.message || `未能生成第 ${sliceIndex + 1} 屏切片`);
             },
 
             async generateSingleMobileSlice(desktopSliceUrl, sliceIndex, totalSlices, mode, prompt) {
@@ -6225,7 +6236,7 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
                             }],
                             generationConfig: { responseModalities: ["IMAGE"] }
                         })
-                    });
+                    }, 2);
                     const data = await resp.json();
                     const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
                     if (part) {
@@ -6272,103 +6283,108 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
                     indepBtn.classList.add('opacity-70');
                 }
 
-                this.updateModeBadge(modeKey, 'independent');
-                const desktopSlices = new Array(count);
-                const mobileSlices = new Array(count);
-                const items = Array.from({ length: count }, (_, i) => i);
-                let completedCount = 0;
-                let failedCount = 0;
+                try {
+                    this.updateModeBadge(modeKey, 'independent');
+                    const desktopSlices = new Array(count);
+                    const mobileSlices = new Array(count);
+                    const items = Array.from({ length: count }, (_, i) => i);
+                    let completedCount = 0;
+                    let failedCount = 0;
 
-                this.showProgress(modeKey);
-                this.updateProgress(modeKey, 0, count, `正在启动 3 进程并发生成管线 (0/${count})...`);
+                    this.showProgress(modeKey);
+                    this.updateProgress(modeKey, 0, count, `正在启动 3 进程并发生成管线 (0/${count})...`);
 
-                const CONCURRENCY_LIMIT = 3;
+                    const CONCURRENCY_LIMIT = 3;
 
-                await this.runPool(items, CONCURRENCY_LIMIT, async (_, i) => {
-                    const screenNum = i + 1;
-                    const src = getSourceSlice ? getSourceSlice(i) : null;
-                    const sectionText = getSectionPrompt ? getSectionPrompt(i) : '';
-                    const refs = getRefImages ? getRefImages(i) : [];
+                    await this.runPool(items, CONCURRENCY_LIMIT, async (_, i) => {
+                        const screenNum = i + 1;
+                        const src = getSourceSlice ? getSourceSlice(i) : null;
+                        const sectionText = getSectionPrompt ? getSectionPrompt(i) : '';
+                        const refs = getRefImages ? getRefImages(i) : [];
 
-                    try {
-                        // 1. 独立生成电脑端 1464x600 (独享完整超清分辨率)
-                        this.updateProgress(modeKey, completedCount, count, `[3进程并发] 正在生成第 ${screenNum}/${count} 屏电脑端 (1464×600)...`);
-                        const dUrl = await this.generateSingleDesktopSlice(modeKey, i, count, src, prompt, refs, sectionText);
-
-                        desktopSlices[i] = {
-                            index: screenNum,
-                            name: `${modeKey}_desktop_slice_${screenNum}_1464x600.jpg`,
-                            dataUrl: dUrl,
-                            spec: `1464×600 px (电脑端 · 独立高精)`,
-                            isFailed: false
-                        };
-
-                        // 2. 独立生成手机端 600x450 (4:3比例)
-                        let mUrl = null;
                         try {
-                            this.updateProgress(modeKey, completedCount, count, `[3进程并发] 正在生成第 ${screenNum}/${count} 屏手机端 (600×450)...`);
-                            mUrl = await this.generateSingleMobileSlice(dUrl, i, count, modeKey, prompt);
-                        } catch (mErr) {
-                            console.warn(`Mobile slice ${screenNum} fallback:`, mErr);
-                            mUrl = await this.createMobileFallback(dUrl);
+                            // 1. 独立生成电脑端 1464x600 (独享完整超清分辨率)
+                            this.updateProgress(modeKey, completedCount, count, `[3进程并发] 正在生成第 ${screenNum}/${count} 屏电脑端 (1464×600)...`);
+                            const dUrl = await this.generateSingleDesktopSlice(modeKey, i, count, src, prompt, refs, sectionText);
+
+                            desktopSlices[i] = {
+                                index: screenNum,
+                                name: `${modeKey}_desktop_slice_${screenNum}_1464x600.jpg`,
+                                dataUrl: dUrl,
+                                spec: `1464×600 px (电脑端 · 独立高精)`,
+                                isFailed: false
+                            };
+
+                            // 2. 独立生成手机端 600x450 (4:3比例)
+                            let mUrl = null;
+                            try {
+                                this.updateProgress(modeKey, completedCount, count, `[3进程并发] 正在生成第 ${screenNum}/${count} 屏手机端 (600×450)...`);
+                                mUrl = await this.generateSingleMobileSlice(dUrl, i, count, modeKey, prompt);
+                            } catch (mErr) {
+                                console.warn(`Mobile slice ${screenNum} fallback:`, mErr);
+                                mUrl = await this.createMobileFallback(dUrl);
+                            }
+
+                            mobileSlices[i] = {
+                                index: screenNum,
+                                name: `${modeKey}_mobile_slice_${screenNum}_600x450.jpg`,
+                                dataUrl: mUrl,
+                                spec: `600×450 px (手机端 · 独立4:3)`,
+                                isFailed: false
+                            };
+
+                            completedCount++;
+                            this.updateProgress(modeKey, completedCount, count, `[3进程并发] 已完成 ${completedCount}/${count} 屏${failedCount > 0 ? ' (' + failedCount + ' 屏失败，可直接重试)' : ''}...`);
+                        } catch (err) {
+                            console.error(`Slice ${screenNum} failed:`, err);
+                            failedCount++;
+                            desktopSlices[i] = {
+                                index: screenNum,
+                                name: `${modeKey}_desktop_slice_${screenNum}_1464x600.jpg`,
+                                dataUrl: null,
+                                isFailed: true,
+                                error: err.message || '生成失败，请点击卡片重试',
+                                spec: `1464×600 px (生成失败)`
+                            };
+                            mobileSlices[i] = {
+                                index: screenNum,
+                                name: `${modeKey}_mobile_slice_${screenNum}_600x450.jpg`,
+                                dataUrl: null,
+                                isFailed: true,
+                                error: '等待电脑端切片重试',
+                                spec: `600×450 px (等待电脑端)`
+                            };
+                            completedCount++;
+                            this.updateProgress(modeKey, completedCount, count, `[3进程并发] 已处理 ${completedCount}/${count} 屏 (${failedCount} 屏失败，可直接重试)...`);
                         }
+                    });
 
-                        mobileSlices[i] = {
-                            index: screenNum,
-                            name: `${modeKey}_mobile_slice_${screenNum}_600x450.jpg`,
-                            dataUrl: mUrl,
-                            spec: `600×450 px (手机端 · 独立4:3)`,
-                            isFailed: false
-                        };
+                    state.desktopSlices = desktopSlices;
+                    state.mobileSlices = mobileSlices;
 
-                        completedCount++;
-                        this.updateProgress(modeKey, completedCount, count, `[3进程并发] 已完成 ${completedCount}/${count} 屏${failedCount > 0 ? ' (' + failedCount + ' 屏失败，可直接重试)' : ''}...`);
-                    } catch (err) {
-                        console.error(`Slice ${screenNum} failed:`, err);
-                        failedCount++;
-                        desktopSlices[i] = {
-                            index: screenNum,
-                            name: `${modeKey}_desktop_slice_${screenNum}_1464x600.jpg`,
-                            dataUrl: null,
-                            isFailed: true,
-                            error: err.message || '生成失败，请点击卡片重试',
-                            spec: `1464×600 px (生成失败)`
-                        };
-                        mobileSlices[i] = {
-                            index: screenNum,
-                            name: `${modeKey}_mobile_slice_${screenNum}_600x450.jpg`,
-                            dataUrl: null,
-                            isFailed: true,
-                            error: '等待电脑端切片重试',
-                            spec: `600×450 px (等待电脑端)`
-                        };
-                        completedCount++;
-                        this.updateProgress(modeKey, completedCount, count, `[3进程并发] 已处理 ${completedCount}/${count} 屏 (${failedCount} 屏失败，可直接重试)...`);
+                    await this.assembleIndependentOutput(modeKey, desktopSlices, mobileSlices);
+
+                    const resultsDiv = document.getElementById(`paplus-${modeKey}-results`);
+                    if (resultsDiv) {
+                        resultsDiv.classList.remove('hidden');
+                        this.switchModeView(modeKey, 'desktop');
+                        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     }
-                });
 
-                state.desktopSlices = desktopSlices;
-                state.mobileSlices = mobileSlices;
-
-                await this.assembleIndependentOutput(modeKey, desktopSlices, mobileSlices);
-                this.hideProgress(modeKey);
-
-                if (indepBtn) {
-                    indepBtn.disabled = false;
-                    indepBtn.classList.remove('opacity-70');
-                }
-
-                const resultsDiv = document.getElementById(`paplus-${modeKey}-results`);
-                if (resultsDiv) {
-                    resultsDiv.classList.remove('hidden');
-                    this.switchModeView(modeKey, 'desktop');
-                    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-
-                if (failedCount > 0) {
-                    showToast(`⚠️ 3进程并发完成：${count - failedCount} 屏成功，${failedCount} 屏生成失败。失败切片可直接点击对应单屏卡片上的【立即重试】！`, 'warning');
-                } else {
-                    showSuccess(`🎉 成功以 3 进程并发完成全部 ${count} 屏切片独立生成！`);
+                    if (failedCount > 0) {
+                        showToast(`⚠️ 3进程并发完成：${count - failedCount} 屏成功，${failedCount} 屏生成失败。失败切片可直接点击对应单屏卡片上的【立即重试】！`, 'warning');
+                    } else {
+                        showSuccess(`🎉 成功以 3 进程并发完成全部 ${count} 屏切片独立生成！`);
+                    }
+                } catch (pipeErr) {
+                    console.error('executeIndependentPipeline error:', pipeErr);
+                    showError('生成流程异常: ' + (pipeErr.message || pipeErr));
+                } finally {
+                    this.hideProgress(modeKey);
+                    if (indepBtn) {
+                        indepBtn.disabled = false;
+                        indepBtn.classList.remove('opacity-70');
+                    }
                 }
             },
 
