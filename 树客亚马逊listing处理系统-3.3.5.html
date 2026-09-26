@@ -2903,7 +2903,7 @@
                 if (!finalDataUrl) return;
 
                 // Avoid pushing identical snapshot consecutively
-                if (this.items.length > 0 && this.items[0].imageBase64 === finalDataUrl) return;
+                if (this.items.length > 0 && this.items[0].imageBase64 === finalDataUrl && this.items[0].title === (title || '历史生成快照')) return;
                 const imageBase64 = finalDataUrl;
 
                 const now = new Date();
@@ -2927,10 +2927,14 @@
                 if (this.isOpen) this.render();
 
                 // Gentle highlight animation on the launcher badge
+                this.pulse();
+            },
+
+            pulse() {
                 const launcher = document.getElementById('global-recycle-bin-launcher');
                 if (launcher) {
-                    launcher.classList.add('ring-4', 'ring-indigo-400');
-                    setTimeout(() => launcher.classList.remove('ring-4', 'ring-indigo-400'), 800);
+                    launcher.classList.add('ring-4', 'ring-indigo-400', 'scale-110');
+                    setTimeout(() => launcher.classList.remove('ring-4', 'ring-indigo-400', 'scale-110'), 800);
                 }
             },
 
@@ -2971,7 +2975,9 @@
                     'AI高清修复': 'bg-blue-100 text-blue-700 border-blue-200',
                     '白底主图': 'bg-amber-100 text-amber-700 border-amber-200',
                     '图像橡皮擦': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-                    'AI图片编辑器': 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                    'AI图片编辑器': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+                    '高级A+套件': 'bg-purple-100 text-purple-700 border-purple-200',
+                    '高级A+': 'bg-purple-100 text-purple-700 border-purple-200'
                 };
 
                 container.innerHTML = `
@@ -4497,10 +4503,33 @@
                 const processBtn = document.getElementById('paplus-edit-process-btn');
                 const count = this.editState.slices.length;
 
-                if (this.editState.desktopSlices.length > 0) {
-                    this.editState.desktopSlices.forEach(s => {
-                        GlobalRecycleBin.push('高级A+套件', s.name, s.dataUrl);
-                    });
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.editState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 连体编辑长图 · 重新生成前快照', this.editState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.editState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 连体编辑长图 · 重新生成前快照', this.editState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.editState.desktopSlices.length > 0) {
+                        this.editState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (this.editState.mobileSlices.length > 0) {
+                        this.editState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将上一轮生成的切片与长图备份至回收站 🗑️', 'info');
                 }
 
                 if (processBtn) {
@@ -4589,12 +4618,44 @@ You are an elite Amazon Premium A+ Master Designer editing a continuous ${count}
 
             async regenEditDesktop() {
                 if (!this.editState.stitchedDataUrl) return;
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.editState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 连体编辑长图 · 重新生成前快照', this.editState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.editState.desktopSlices && this.editState.desktopSlices.length > 0) {
+                        this.editState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的电脑端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新生成电脑端...', 'info');
                 await this.runEditAi();
             },
 
             async regenEditMobile() {
                 if (!this.editState.desktopPanoramaUrl) return;
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.editState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 连体编辑长图 · 重新生成前快照', this.editState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.editState.mobileSlices && this.editState.mobileSlices.length > 0) {
+                        this.editState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的手机端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新生图手机端...', 'info');
                 const count = this.editState.slices.length;
                 const prompt = (document.getElementById('paplus-edit-prompt-input')?.value || '').trim();
@@ -4875,10 +4936,33 @@ You are an elite Amazon Premium A+ Master Designer editing a continuous ${count}
                 const processBtn = document.getElementById('paplus-convert-process-btn');
                 const count = this.convertState.slices.length;
 
-                if (this.convertState.desktopSlices.length > 0) {
-                    this.convertState.desktopSlices.forEach(s => {
-                        GlobalRecycleBin.push('高级A+套件', s.name, s.dataUrl);
-                    });
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convertState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 普通A+转化长图 · 重新生成前快照', this.convertState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convertState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 普通A+转化长图 · 重新生成前快照', this.convertState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convertState.desktopSlices.length > 0) {
+                        this.convertState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (this.convertState.mobileSlices.length > 0) {
+                        this.convertState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将上一轮生成的切片与长图备份至回收站 🗑️', 'info');
                 }
 
                 if (processBtn) {
@@ -4976,12 +5060,44 @@ ${prompt ? 'EXTRA USER DIRECTIVE: ' + prompt : ''}
             },
 
             async regenConvertDesktop() {
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convertState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 普通A+转化长图 · 重新生成前快照', this.convertState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convertState.desktopSlices && this.convertState.desktopSlices.length > 0) {
+                        this.convertState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏转化切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的电脑端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新通过大模型生成电脑端...', 'info');
                 await this.runConvertAi();
             },
 
             async regenConvertMobile() {
                 if (!this.convertState.desktopPanoramaUrl) return;
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convertState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 普通A+转化长图 · 重新生成前快照', this.convertState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convertState.mobileSlices && this.convertState.mobileSlices.length > 0) {
+                        this.convertState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏转化切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的手机端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新通过大模型生成手机端...', 'info');
                 const count = this.convertState.slices.length;
                 const prompt = (document.getElementById('paplus-convert-prompt-input')?.value || '').trim();
@@ -5350,10 +5466,33 @@ Provide a structured set of English headlines, benefit callouts, and bullet poin
                     userPrompt = (promptInput?.value || '').trim();
                 }
 
-                if (this.convert1688State.desktopSlices.length > 0) {
-                    this.convert1688State.desktopSlices.forEach(s => {
-                        GlobalRecycleBin.push('高级A+套件(1688)', s.name, s.dataUrl);
-                    });
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convert1688State.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 1688转化长图 · 重新生成前快照', this.convert1688State.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convert1688State.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 1688转化长图 · 重新生成前快照', this.convert1688State.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convert1688State.desktopSlices.length > 0) {
+                        this.convert1688State.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏1688切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (this.convert1688State.mobileSlices.length > 0) {
+                        this.convert1688State.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏1688切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将上一轮生成的切片与长图备份至回收站 🗑️', 'info');
                 }
 
                 if (processBtn) {
@@ -5471,12 +5610,44 @@ ${userPrompt ? userPrompt : ''}
             },
 
             async regen1688Desktop() {
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convert1688State.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 1688转化长图 · 重新生成前快照', this.convert1688State.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convert1688State.desktopSlices && this.convert1688State.desktopSlices.length > 0) {
+                        this.convert1688State.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏1688切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的电脑端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新通过大模型生成电脑端...', 'info');
                 await this.run1688Ai();
             },
 
             async regen1688Mobile() {
                 if (!this.convert1688State.desktopPanoramaUrl) return;
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.convert1688State.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 1688转化长图 · 重新生成前快照', this.convert1688State.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.convert1688State.mobileSlices && this.convert1688State.mobileSlices.length > 0) {
+                        this.convert1688State.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏1688切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的手机端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新通过大模型生成手机端...', 'info');
                 const count = this.convert1688State.slices.length;
                 const prompt = (document.getElementById('paplus-1688-prompt-input')?.value || '').trim();
@@ -5667,10 +5838,33 @@ ${prompt ? prompt : ''}
                 const count = this.genState.sliceCount || 6;
                 const processBtn = document.getElementById('paplus-gen-process-btn');
 
-                if (this.genState.desktopSlices.length > 0) {
-                    this.genState.desktopSlices.forEach(s => {
-                        GlobalRecycleBin.push('高级A+套件', s.name, s.dataUrl);
-                    });
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.genState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 全景长图 · 重新生成前快照', this.genState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.genState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 全景长图 · 重新生成前快照', this.genState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.genState.desktopSlices.length > 0) {
+                        this.genState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏全景切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (this.genState.mobileSlices.length > 0) {
+                        this.genState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏全景切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将上一轮生成的切片与长图备份至回收站 🗑️', 'info');
                 }
 
                 if (processBtn) {
@@ -5816,12 +6010,44 @@ ${prompt}
             },
 
             async regenGenDesktop() {
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.genState.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+电脑端] 全景长图 · 重新生成前快照', this.genState.desktopPanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.genState.desktopSlices && this.genState.desktopSlices.length > 0) {
+                        this.genState.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏全景切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的电脑端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新生成电脑端全景长图...', 'info');
                 await this.runGenAi();
             },
 
             async regenGenMobile() {
                 if (!this.genState.desktopPanoramaUrl) return;
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
+                    if (this.genState.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', '[高级A+手机端] 全景长图 · 重新生成前快照', this.genState.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (this.genState.mobileSlices && this.genState.mobileSlices.length > 0) {
+                        this.genState.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏全景切片 · 重新生成前快照`, s.dataUrl);
+                                backedUp = true;
+                            }
+                        });
+                    }
+                    if (backedUp) showToast('已将重新生成前的手机端长图与切片备份至回收站 🗑️', 'info');
+                }
                 showToast('正在单独重新通过大模型生成手机端...', 'info');
                 const count = this.genState.sliceCount || 6;
                 const prompt = (document.getElementById('paplus-gen-prompt-input')?.value || '').trim();
@@ -6274,21 +6500,33 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
 
                 // 启动全量独立生成前，将已有全部切片及全景长图安全备份至全局回收站
                 if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
                     if (state.desktopSlices && state.desktopSlices.length > 0) {
-                        state.desktopSlices.forEach(s => {
-                            if (s && s.dataUrl) GlobalRecycleBin.push('高级A+套件', s.name || `${modeKey}_电脑端切片_备份`, s.dataUrl);
+                        state.desktopSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 第${i + 1}屏切片 · 批量重跑前备份`, s.dataUrl);
+                                backedUp = true;
+                            }
                         });
                     }
                     if (state.mobileSlices && state.mobileSlices.length > 0) {
-                        state.mobileSlices.forEach(s => {
-                            if (s && s.dataUrl) GlobalRecycleBin.push('高级A+套件', s.name || `${modeKey}_手机端切片_备份`, s.dataUrl);
+                        state.mobileSlices.forEach((s, i) => {
+                            if (s && s.dataUrl) {
+                                GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${i + 1}屏切片 · 批量重跑前备份`, s.dataUrl);
+                                backedUp = true;
+                            }
                         });
                     }
                     if (state.desktopPanoramaUrl) {
-                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_电脑端全景长图_覆盖前备份`, state.desktopPanoramaUrl);
+                        GlobalRecycleBin.push('高级A+套件', `[高级A+电脑端] 全景长图 · 批量重跑前备份`, state.desktopPanoramaUrl);
+                        backedUp = true;
                     }
                     if (state.mobilePanoramaUrl) {
-                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_手机端全景长图_覆盖前备份`, state.mobilePanoramaUrl);
+                        GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 全景长图 · 批量重跑前备份`, state.mobilePanoramaUrl);
+                        backedUp = true;
+                    }
+                    if (backedUp) {
+                        showToast('已将上一轮生成的切片与长图安全备份至回收站 🗑️', 'info');
                     }
                 }
 
@@ -6565,28 +6803,29 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
                 const targetSlice = isMobile ? state.mobileSlices[sliceIndex] : state.desktopSlices[sliceIndex];
                 if (!targetSlice) return;
 
-                // 单独重试前：将当前切片与受影响图片安全备份至全局回收站
+                // 单独重绘前：将当前切片安全备份至全局回收站
+                const sideText = isMobile ? '手机端 600×450' : '电脑端 1464×600';
                 if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    let backedUp = false;
                     if (targetSlice.dataUrl) {
-                        GlobalRecycleBin.push('高级A+套件', targetSlice.name || `${modeKey}_${isMobile ? '手机端' : '电脑端'}_第${sliceIndex + 1}屏_重试前备份`, targetSlice.dataUrl);
+                        GlobalRecycleBin.push('高级A+套件', `[高级A+${isMobile ? '手机端' : '电脑端'}] 第${sliceIndex + 1}屏 · 重绘前快照`, targetSlice.dataUrl);
+                        backedUp = true;
                     } else if (state.slices && state.slices[sliceIndex] && state.slices[sliceIndex].dataUrl) {
-                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_原始切片_第${sliceIndex + 1}屏_备份`, state.slices[sliceIndex].dataUrl);
+                        GlobalRecycleBin.push('高级A+套件', `[高级A+原始切片] 第${sliceIndex + 1}屏 · 备份`, state.slices[sliceIndex].dataUrl);
+                        backedUp = true;
                     }
-                    // 若重试电脑端，由于完成后会联动重试/修复手机端切片，如原手机端切片已有结果也同步备份
+                    // 若重绘电脑端，且原手机端切片已有结果，也同步备份即将被联动覆盖的手机端切片
                     if (!isMobile && state.mobileSlices && state.mobileSlices[sliceIndex] && state.mobileSlices[sliceIndex].dataUrl) {
                         const mSlice = state.mobileSlices[sliceIndex];
-                        GlobalRecycleBin.push('高级A+套件', mSlice.name || `${modeKey}_手机端_第${sliceIndex + 1}屏_联动重试前备份`, mSlice.dataUrl);
+                        GlobalRecycleBin.push('高级A+套件', `[高级A+手机端] 第${sliceIndex + 1}屏 · 联动重绘前快照`, mSlice.dataUrl);
+                        backedUp = true;
                     }
-                    // 备份受当前单屏重绘影响的完整长图
-                    if (state.desktopPanoramaUrl) {
-                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_电脑端长图_第${sliceIndex + 1}屏重试前备份`, state.desktopPanoramaUrl);
-                    }
-                    if (state.mobilePanoramaUrl) {
-                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_手机端长图_第${sliceIndex + 1}屏重试前备份`, state.mobilePanoramaUrl);
+                    if (backedUp) {
+                        showToast(`已将重绘前的第 ${sliceIndex + 1} 屏(${isMobile ? '手机端' : '电脑端'})安全备份至回收站 🗑️`, 'info');
                     }
                 }
 
-                showToast(`正在单独重新生成第 ${sliceIndex + 1} 屏 (${isMobile ? '手机端 600×450' : '电脑端 1464×600'})...`, 'info');
+                showToast(`正在单独重绘第 ${sliceIndex + 1} 屏 (${sideText})...`, 'info');
 
                 targetSlice.isRetrying = true;
                 this.renderModeSlicesGrid(modeKey);
