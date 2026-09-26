@@ -6272,10 +6272,24 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
                 const modeKey = (mode === '1688' || mode === 'convert1688') ? '1688' : mode;
                 const indepBtn = document.getElementById(`paplus-${modeKey}-process-indep-btn`);
 
-                if (state.desktopSlices && state.desktopSlices.length > 0) {
-                    state.desktopSlices.forEach(s => {
-                        if (s && s.dataUrl) GlobalRecycleBin.push('高级A+套件', s.name, s.dataUrl);
-                    });
+                // 启动全量独立生成前，将已有全部切片及全景长图安全备份至全局回收站
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    if (state.desktopSlices && state.desktopSlices.length > 0) {
+                        state.desktopSlices.forEach(s => {
+                            if (s && s.dataUrl) GlobalRecycleBin.push('高级A+套件', s.name || `${modeKey}_电脑端切片_备份`, s.dataUrl);
+                        });
+                    }
+                    if (state.mobileSlices && state.mobileSlices.length > 0) {
+                        state.mobileSlices.forEach(s => {
+                            if (s && s.dataUrl) GlobalRecycleBin.push('高级A+套件', s.name || `${modeKey}_手机端切片_备份`, s.dataUrl);
+                        });
+                    }
+                    if (state.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_电脑端全景长图_覆盖前备份`, state.desktopPanoramaUrl);
+                    }
+                    if (state.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_手机端全景长图_覆盖前备份`, state.mobilePanoramaUrl);
+                    }
                 }
 
                 if (indepBtn) {
@@ -6550,6 +6564,27 @@ ${prompt ? 'USER DIRECTIVE: ' + prompt : ''}
                 const state = this.getState(modeKey);
                 const targetSlice = isMobile ? state.mobileSlices[sliceIndex] : state.desktopSlices[sliceIndex];
                 if (!targetSlice) return;
+
+                // 单独重试前：将当前切片与受影响图片安全备份至全局回收站
+                if (typeof GlobalRecycleBin !== 'undefined' && GlobalRecycleBin.push) {
+                    if (targetSlice.dataUrl) {
+                        GlobalRecycleBin.push('高级A+套件', targetSlice.name || `${modeKey}_${isMobile ? '手机端' : '电脑端'}_第${sliceIndex + 1}屏_重试前备份`, targetSlice.dataUrl);
+                    } else if (state.slices && state.slices[sliceIndex] && state.slices[sliceIndex].dataUrl) {
+                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_原始切片_第${sliceIndex + 1}屏_备份`, state.slices[sliceIndex].dataUrl);
+                    }
+                    // 若重试电脑端，由于完成后会联动重试/修复手机端切片，如原手机端切片已有结果也同步备份
+                    if (!isMobile && state.mobileSlices && state.mobileSlices[sliceIndex] && state.mobileSlices[sliceIndex].dataUrl) {
+                        const mSlice = state.mobileSlices[sliceIndex];
+                        GlobalRecycleBin.push('高级A+套件', mSlice.name || `${modeKey}_手机端_第${sliceIndex + 1}屏_联动重试前备份`, mSlice.dataUrl);
+                    }
+                    // 备份受当前单屏重绘影响的完整长图
+                    if (state.desktopPanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_电脑端长图_第${sliceIndex + 1}屏重试前备份`, state.desktopPanoramaUrl);
+                    }
+                    if (state.mobilePanoramaUrl) {
+                        GlobalRecycleBin.push('高级A+套件', `${modeKey}_手机端长图_第${sliceIndex + 1}屏重试前备份`, state.mobilePanoramaUrl);
+                    }
+                }
 
                 showToast(`正在单独重新生成第 ${sliceIndex + 1} 屏 (${isMobile ? '手机端 600×450' : '电脑端 1464×600'})...`, 'info');
 
