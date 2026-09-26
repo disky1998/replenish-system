@@ -1,8 +1,8 @@
 {
-  "latest_version": "3.2.1",
-  "version_name": "VER 3.2.1 · 局部重塑画板版",
-  "update_time": "2026-09-23",
+  "latest_version": "3.3.5",
+  "version_name": "VER 3.3.5 · 高级A+双引擎极速版",
+  "update_time": "2026-09-26",
   "new_version_url": "https://share.gemini.google/dkeS9BibiyId",
-  "release_notes": "1、图片编辑新增局部编辑功能；2、局部编辑页面可单图导入可多涂导入，多图导入时可针对单一图片执行拖动、缩放、AI重绘",
+  "release_notes": "1、高级A+全能套件全面升级双引擎（全景通栏长图生成 + 独立单张切片生成）；2、图片生成支持3进程并发处理，单一切片异常隔离并可直接单屏重试；3、UI界面轻量精简，移除冗余繁琐说明。",
   "mandatory": false
 }
