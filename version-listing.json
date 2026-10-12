@@ -2,7 +2,7 @@
   "latest_version": "3.4.1",
   "version_name": "VER 3.4.1 · 高级A+双引擎极速版",
   "update_time": "2026-10-12",
-  "new_version_url": "https://raw.githubusercontent.com/disky1998/replenish-system/main/%E6%A0%91%E5%AE%A2%E4%BA%9A%E9%A9%AC%E9%80%8Alisting%E5%A4%84%E7%90%86%E7%B3%BB%E7%BB%9F-3.4.1.html",
-  "release_notes": "1、高级A+手机端排版重磅修复：100%还原3.3.5原版大模型全画幅4:3原生满屏排版（FULL-BLEED 4:3），彻底解决手机端内容两头留空铺不平及比例畸变问题；\n2、电脑端与手机端双端独立大模型引擎：电脑端享受4K极清长卷（1464×600/屏超宽画质），手机端享受4:3竖屏满幅铺平重构（600×450/屏），双端互不干扰；\n3、支持8192px原画直通与长图智能等比拆解，彻底杜绝输入压缩损失与画面拉扁变形。",
+  "new_version_url": "https://share.gemini.google/QvdvkMKIBwar",
+  "release_notes": "1、替换了新的图片模型 Nano Banana 2.1；\n2、新模型的特性高级A+的合并生成支持4K模式，解决了旧模型模糊的问题",
   "mandatory": false
 }
