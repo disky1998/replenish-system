@@ -2,7 +2,7 @@
   "latest_version": "3.4.8",
   "version_name": "VER 3.4.8 · 高级A+双引擎极速版",
   "update_time": "2026-10-16",
-  "new_version_url": "https://share.gemini.google/QvdvkMKIBwar",
+  "new_version_url": "https://share.gemini.google/jKiA7vkKls6S",
   "release_notes": "1、高级A+全景生成模式与切片管线重磅修复：彻底解除 9:16 强制比例锁，还原 100% 完整长卷保真贴合绘制，彻底解决电脑端长图左侧文字被裁切、信息不全的问题；\n2、高级A+四大模式（连体编辑、普通A+转化、1688转化、全景生成）全面加入一键清空重置页面功能；\n3、修复 1688 转化与全景生成工作区串扰漂移问题，实现 DOM 容器严格隔离。",
   "mandatory": false
 }
