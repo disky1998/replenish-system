@@ -2,7 +2,7 @@
   "latest_version": "3.5.1",
   "version_name": "VER 3.5.1 · 高级A+双引擎全离线极速版",
   "update_time": "2026-11-03",
-  "new_version_url": "https://share.gemini.google/jKiA7vkKls6S",
+  "new_version_url": "https://share.gemini.google/HQ6qHqUKMs3e",
   "release_notes": "1、核心样式引擎全离线内置化重磅升级：彻底拔除海外 cdn.tailwindcss.com 依赖，将 Tailwind 编译内核 100% 离线内嵌至单文件，彻底解决海外网络波动导致的白屏、排版崩塌与加载延迟，实现 0ms 瞬间秒开；\n2、高级A+四大模式（连体编辑、普通A+转化、1688转化、全景生成）全功能持续优化与 DOM 严格隔离；\n3、全套 77 项自动化回归测试验证无损通过。",
   "mandatory": false
 }
