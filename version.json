@@ -1,11 +1,10 @@
 {
-  "version": "4.4.3",
-  "releaseDate": "2026-08-28",
-  "title": "v4.4.3 本地在途算法升级版",
+  "version": "4.5.1",
+  "releaseDate": "2026-11-05",
+  "title": "v4.5.1 固定动态加权算法版",
   "changelog": [
-    "1、新增对发货系统补充本地在途状态：部分核对 的支持",
-    "2、发货系统的本地在途数据修改为：采购数量-核对数量"
+    "1、固定动态加权算法"
   ],
   "forceUpdate": false,
-  "downloadFileName": "补货辅助系统4.4.3.html"
+  "downloadFileName": "补货辅助系统4.5.1.html"
 }
