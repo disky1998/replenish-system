@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.4.3</title>
+    <title>智能补货辅助系统 v4.5.1</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 -->
@@ -892,27 +892,27 @@
                                 <input type="range" v-model.number="settings.newProductThresholdMonths" min="3" max="24" step="1" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
                             </div>
 
-                            <label class="flex items-center gap-2 cursor-pointer mt-1">
-                                <input type="radio" v-model="settings.salesCalcMethod" value="average" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                            <label class="flex items-center gap-2 cursor-not-allowed opacity-50 mt-1" title="算法已固定为动态加权法">
+                                <input type="radio" v-model="settings.salesCalcMethod" value="average" disabled class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-not-allowed">
                                 <span class="text-sm text-slate-700 font-medium">常规均值法 <span class="text-xs font-normal text-slate-400 block">(近30天总销量 ÷ 30)</span></span>
                             </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" v-model="settings.salesCalcMethod" value="weighted" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
-                                <span class="text-sm text-slate-700 font-medium">动态加权法 <span class="text-xs font-normal text-orange-500 block">(自定义老品与新品天数占比)</span></span>
+                            <label class="flex items-center gap-2 cursor-default">
+                                <input type="radio" v-model="settings.salesCalcMethod" value="weighted" disabled class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-default">
+                                <span class="text-sm text-slate-700 font-medium">动态加权法 <span class="text-xs font-normal text-orange-500 block">(固定老品与新品天数占比)</span></span>
                             </label>
                             
                             <div v-if="settings.salesCalcMethod === 'weighted'" class="flex flex-col gap-2 mt-2 pt-3 border-t border-indigo-100">
                                 <div class="grid grid-cols-4 gap-2 items-center">
                                     <span class="text-[10px] font-bold text-slate-500 text-center">老品</span>
-                                    <div><label class="text-[9px] text-indigo-500">7天(%)</label><input type="number" v-model.number="settings.weight7" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
-                                    <div><label class="text-[9px] text-indigo-500">14天(%)</label><input type="number" v-model.number="settings.weight14" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
-                                    <div><label class="text-[9px] text-indigo-500">30天(%)</label><input type="number" v-model.number="settings.weight30" class="w-full bg-white border border-indigo-200 rounded p-1 text-xs text-center"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">7天(%)</label><input type="number" :value="settings.weight7" readonly disabled class="w-full bg-slate-50 border border-indigo-200 rounded p-1 text-xs text-center text-slate-700 font-bold cursor-not-allowed select-none"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">14天(%)</label><input type="number" :value="settings.weight14" readonly disabled class="w-full bg-slate-50 border border-indigo-200 rounded p-1 text-xs text-center text-slate-700 font-bold cursor-not-allowed select-none"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">30天(%)</label><input type="number" :value="settings.weight30" readonly disabled class="w-full bg-slate-50 border border-indigo-200 rounded p-1 text-xs text-center text-slate-700 font-bold cursor-not-allowed select-none"></div>
                                 </div>
                                 <div class="grid grid-cols-4 gap-2 items-center pt-2 border-t border-indigo-50 border-dashed">
                                     <span class="text-[10px] font-bold text-green-600 text-center bg-green-100 rounded-sm leading-none py-1 mx-1">新品</span>
-                                    <div><label class="text-[9px] text-green-600">7天(%)</label><input type="number" v-model.number="settings.weightNew7" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
-                                    <div><label class="text-[9px] text-green-600">14天(%)</label><input type="number" v-model.number="settings.weightNew14" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
-                                    <div><label class="text-[9px] text-green-600">30天(%)</label><input type="number" v-model.number="settings.weightNew30" class="w-full bg-white border border-green-200 rounded p-1 text-xs text-center text-green-700"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">7天(%)</label><input type="number" :value="settings.weightNew7" readonly disabled class="w-full bg-slate-50 border border-green-200 rounded p-1 text-xs text-center text-green-700 font-bold cursor-not-allowed select-none"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">14天(%)</label><input type="number" :value="settings.weightNew14" readonly disabled class="w-full bg-slate-50 border border-green-200 rounded p-1 text-xs text-center text-green-700 font-bold cursor-not-allowed select-none"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">30天(%)</label><input type="number" :value="settings.weightNew30" readonly disabled class="w-full bg-slate-50 border border-green-200 rounded p-1 text-xs text-center text-green-700 font-bold cursor-not-allowed select-none"></div>
                                 </div>
                             </div>
                         </div>
@@ -1097,7 +1097,7 @@
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.4.3';
+        const CURRENT_VERSION = '4.5.1';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1552,14 +1552,14 @@
                     showKsaCrossBorder: false, 
                     oosOptimizationEnabled: false,
                     oosCalcMethod: 1, 
-                    salesCalcMethod: 'average',
-                    weight7: 20, 
-                    weight14: 30,
+                    salesCalcMethod: 'weighted',
+                    weight7: 10, 
+                    weight14: 40,
                     weight30: 50,
                     newProductThresholdMonths: 6,
-                    weightNew7: 70,
-                    weightNew14: 20,
-                    weightNew30: 10,
+                    weightNew7: 25,
+                    weightNew14: 40,
+                    weightNew30: 35,
                     uaeAirLeadTime: 15,
                     ksaAirLeadTime: 15,
                     uaeSeaLeadTime: 35,
@@ -1668,7 +1668,17 @@
                         }
                         
                         const savedSettings = await localforage.getItem('replenish_settings');
-                        if (savedSettings) settings.value = { ...settings.value, ...savedSettings };
+                        if (savedSettings) {
+                            settings.value = { ...settings.value, ...savedSettings };
+                        }
+                        // 强制覆盖为固定动态加权算法：老品 10/40/50，新品 25/40/35，旧缓存此项覆盖；newProductThresholdMonths 保留旧缓存
+                        settings.value.salesCalcMethod = 'weighted';
+                        settings.value.weight7 = 10;
+                        settings.value.weight14 = 40;
+                        settings.value.weight30 = 50;
+                        settings.value.weightNew7 = 25;
+                        settings.value.weightNew14 = 40;
+                        settings.value.weightNew30 = 35;
                         
                         setTimeout(() => {
                             checkVersionUpdate(false);
