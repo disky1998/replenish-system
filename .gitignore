@@ -1,0 +1,4 @@
+scratch/
+.system_generated/
+*.tmp
+node_modules/
