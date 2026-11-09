@@ -1,10 +1,10 @@
 {
-  "version": "4.6.1",
-  "releaseDate": "2026-11-06",
-  "title": "v4.6.1 账号登录与云存储配置同步版",
+  "version": "4.6.3",
+  "releaseDate": "2026-11-09",
+  "title": "v4.6.3 优化计算性能减少卡顿版",
   "changelog": [
-    "1、新增账号登录和云存储配置的功能，更换任何设备登录账号配置都一致"
+    "1、优化计算性能，减少卡顿"
   ],
   "forceUpdate": false,
-  "downloadFileName": "补货辅助系统4.6.1.html"
+  "downloadFileName": "补货辅助系统4.6.3.html"
 }
