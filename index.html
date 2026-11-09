@@ -806,17 +806,17 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                 
                                 <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <div class="flex items-center justify-center">
-                                        <input type="number" v-model.number="item.tempFbaStock" @keyup.enter="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock" class="editable-input text-sm text-slate-700 w-16">
+                                        <input type="number" v-model.number="item.tempFbaStock" @keyup.enter="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock; saveProcessedData()" class="editable-input text-sm text-slate-700 w-16">
                                         <div class="w-6 flex justify-center shrink-0">
-                                            <button v-if="item.tempFbaStock !== item.fbaStock" @click="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
+                                            <button v-if="item.tempFbaStock !== item.fbaStock" @click="item.fbaStock = item.tempFbaStock === '' ? 0 : item.tempFbaStock; saveProcessedData()" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="p-1.5 text-center align-middle border-b border-slate-100">
                                     <div class="flex items-center justify-center">
-                                        <input type="number" v-model.number="item.tempOnTheWay" @keyup.enter="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay" class="editable-input text-sm text-slate-700 placeholder-slate-300 w-16" placeholder="填数量">
+                                        <input type="number" v-model.number="item.tempOnTheWay" @keyup.enter="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay; saveProcessedData()" class="editable-input text-sm text-slate-700 placeholder-slate-300 w-16" placeholder="填数量">
                                         <div class="w-6 flex justify-center shrink-0">
-                                            <button v-if="item.tempOnTheWay !== item.onTheWay" @click="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
+                                            <button v-if="item.tempOnTheWay !== item.onTheWay" @click="item.onTheWay = item.tempOnTheWay === '' ? 0 : item.tempOnTheWay; saveProcessedData()" class="text-base hover:scale-110 transition-transform text-green-600 drop-shadow-sm cursor-pointer" title="确认生效">☑️</button>
                                         </div>
                                     </div>
                                 </td>
@@ -870,7 +870,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                 
                                 <!-- 新增：实际补货量 -->
                                 <td class="p-1.5 text-center align-middle border-b border-slate-100">
-                                    <input type="number" v-model.number="item.actualRestock" class="editable-input text-sm text-indigo-700 font-bold bg-indigo-50/50 w-20 shadow-inner" placeholder="填入数量">
+                                    <input type="number" v-model.number="item.actualRestock" @input="saveProcessedData" class="editable-input text-sm text-indigo-700 font-bold bg-indigo-50/50 w-20 shadow-inner" placeholder="填入数量">
                                 </td>
 
                                 <td class="p-1.5 text-center align-middle border-b border-slate-100"
@@ -2075,52 +2075,37 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                             console.log("数据迁移完成！彻底告别 5MB 限制！");
                         }
 
-                        // 3. 从 IndexedDB 异步读取数据
-                        const savedSkuData = await localforage.getItem('replenish_skuBaseMap');
-                        if (savedSkuData) skuBaseMap.value = savedSkuData;
+                        // 3. 从 IndexedDB 异步读取数据 (独立异常保护，数据自愈，绝不阻断初始化)
+                        try {
+                            const savedSkuData = await localforage.getItem('replenish_skuBaseMap');
+                            if (savedSkuData && typeof savedSkuData === 'object') { 
+                                skuBaseMap.value = savedSkuData; 
+                            }
+                        } catch (errSku) {
+                            console.error('读取 SKU 数据库缓存失败:', errSku);
+                        }
                         
-                        const savedData = await localforage.getItem('replenish_processedData');
-                        if (savedData) {
-                            processedData.value = savedData.map(item => {
-                                if (!item.sparklinePoints && item.salesTrend) {
-                                    item.sparklinePoints = getSparklinePointsRaw(item.salesTrend);
-                                    item.sparklinePath = getSparklinePathRaw(item.sparklinePoints);
-                                    item.sparklineFill = getSparklineFillRaw(item.sparklinePoints);
-                                }
-                                if (item.isNewVersion && (!item.newTrendData || !item.newTrendData.linePath)) {
-                                    item.newTrendData = computeNewTrendData(item.totalSales7 || 0, item.totalSales14 || 0, item.monthlySales || 0);
-                                }
-                                return createReactiveItem(item);
-                            });
+                        try {
+                            const savedData = await localforage.getItem('replenish_processedData');
+                            if (savedData && Array.isArray(savedData)) {
+                                processedData.value = savedData.map(item => {
+                                    if (!item.sparklinePoints && item.salesTrend) {
+                                        item.sparklinePoints = getSparklinePointsRaw(item.salesTrend);
+                                        item.sparklinePath = getSparklinePathRaw(item.sparklinePoints);
+                                        item.sparklineFill = getSparklineFillRaw(item.sparklinePoints);
+                                    }
+                                    if (item.isNewVersion && (!item.newTrendData || !item.newTrendData.linePath)) {
+                                        item.newTrendData = computeNewTrendData(item.totalSales7 || 0, item.totalSales14 || 0, item.monthlySales || 0);
+                                    }
+                                    return createReactiveItem(item);
+                                });
+                            }
+                        } catch (errData) {
+                            console.error('读取销量数据缓存失败，已自动恢复默认状态:', errData);
+                            processedData.value = [];
                         }
                         
                         // 需求1：页面加载/刷新时自动从 localStorage 恢复登录态 (免去反复重新登录)
-                const savedToken = localStorage.getItem('replenish_user_token');
-                const savedUserStr = localStorage.getItem('replenish_user_info');
-                const savedLockedStr = localStorage.getItem('replenish_locked_fields');
-                if (savedToken && savedUserStr) {
-                    try {
-                        userToken.value = savedToken;
-                        currentUser.value = JSON.parse(savedUserStr);
-                        if (savedLockedStr) lockedFields.value = JSON.parse(savedLockedStr);
-                        isUserLoggedIn.value = true;
-                        // 静默联网向后台同步最新配置与锁定状态 (需求3)
-                        fetchLatestSettingsFromCloud(false);
-                    } catch (err) {
-                        console.error('自动登录解析失败:', err);
-                    }
-                }
-
-                const savedSettings = await localforage.getItem('replenish_settings');
-                        if (savedSettings) {
-                            settings.value = { ...settings.value, ...savedSettings };
-                        }
-                        
-
-                // --- 页面挂载与初始化生命周期 ---
-                onMounted(async () => {
-                    try {
-                        // 1. 读取本地持久化凭据恢复登录态 (需求1：刷新免登)
                         const savedToken = localStorage.getItem('replenish_user_token');
                         const savedUserStr = localStorage.getItem('replenish_user_info');
                         const savedLockedStr = localStorage.getItem('replenish_locked_fields');
@@ -2133,36 +2118,19 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                                 // 静默联网向后台同步最新配置与锁定状态 (需求3)
                                 fetchLatestSettingsFromCloud(false);
                             } catch (err) {
-                                console.error('恢复登录态异常:', err);
+                                console.error('自动登录解析失败:', err);
                             }
                         }
 
-                        // 2. 读取 IndexedDB 缓存
-                        const savedSkuData = await localforage.getItem('replenish_skuBaseMap');
-                        if (savedSkuData) {
-                            skuBaseMap.value = savedSkuData;
-                            hasSkuData.value = true;
+                        try {
+                            const savedSettings = await localforage.getItem('replenish_settings');
+                            if (savedSettings) {
+                                settings.value = { ...settings.value, ...savedSettings };
+                            }
+                        } catch (errSet) {
+                            console.error('读取配置缓存失败:', errSet);
                         }
-                        const savedData = await localforage.getItem('replenish_processedData');
-                        if (savedData) {
-                            processedData.value = savedData.map(item => {
-                                if (!item.sparklinePoints && item.salesTrend) {
-                                    item.sparklinePoints = getSparklinePointsRaw(item.salesTrend);
-                                    item.sparklinePath = getSparklinePathRaw(item.sparklinePoints);
-                                    item.sparklineFill = getSparklineFillRaw(item.sparklinePoints);
-                                }
-                                if (item.isNewVersion && (!item.newTrendData || !item.newTrendData.linePath)) {
-                                    item.newTrendData = computeNewTrendData(item.totalSales7 || 0, item.totalSales14 || 0, item.monthlySales || 0);
-                                }
-                                return createReactiveItem(item);
-                            });
-                        }
-                        const savedSettings = await localforage.getItem('replenish_settings');
-                        if (savedSettings) {
-                            settings.value = { ...settings.value, ...savedSettings };
-                        }
-
-                // 强制覆盖为固定动态加权算法：老品 10/40/50，新品 25/40/35，旧缓存此项覆盖；newProductThresholdMonths 保留旧缓存
+                        // 强制覆盖为固定动态加权算法：老品 10/40/50，新品 25/40/35，旧缓存此项覆盖；newProductThresholdMonths 保留旧缓存
                         settings.value.salesCalcMethod = 'weighted';
                         settings.value.weight7 = 10;
                         settings.value.weight14 = 40;
@@ -2176,8 +2144,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                         }, 1200);
                         
                     } catch (e) {
-                        console.error('读取 IndexedDB 缓存失败', e);
-                        alert("底层数据库读取失败，请重试！");
+                        console.error('onMounted 初始化未知异常:', e);
                     }
                 });
                 // ---------------------------------
@@ -2193,9 +2160,9 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                     }, 800); 
                 }, { deep: true });
 
-                // 2. 销量表保存（延迟 500ms，附加数据瘦身机制，丢弃画图垃圾数据）
+                // 2. 销量表高性能防抖保存机制 (移除 deep: true 消除 663 个对象的递归 traverse 卡顿)
                 let dataSaveTimer = null;
-                watch(processedData, () => {
+                const saveProcessedData = () => {
                     if (dataSaveTimer) clearTimeout(dataSaveTimer);
                     dataSaveTimer = setTimeout(() => {
                         try {
@@ -2210,58 +2177,8 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                             console.error('处理保存数据时遇到未知错误:', error);
                         }
                     }, 500);
-                }, { deep: true });
-
-                
-                // 强制覆盖为固定动态加权算法：老品 10/40/50，新品 25/40/35，旧缓存此项覆盖；newProductThresholdMonths 保留旧缓存
-                        settings.value.salesCalcMethod = 'weighted';
-                        settings.value.weight7 = 10;
-                        settings.value.weight14 = 40;
-                        settings.value.weight30 = 50;
-                        settings.value.weightNew7 = 25;
-                        settings.value.weightNew14 = 40;
-                        settings.value.weightNew30 = 35;
-                        
-                        setTimeout(() => {
-                            checkVersionUpdate(false);
-                        }, 1200);
-                        
-                    } catch (e) {
-                        console.error('读取 IndexedDB 缓存失败', e);
-                        alert("底层数据库读取失败，请重试！");
-                    }
-                });
-                // ---------------------------------
-
-// --- 替换原有的三个 watch 代码块 ---
-
-                // 1. SKU 库保存（延迟 800ms 存入 IndexedDB）
-                let skuSaveTimer = null;
-                watch(skuBaseMap, () => {
-                    if (skuSaveTimer) clearTimeout(skuSaveTimer);
-                    skuSaveTimer = setTimeout(() => {
-                        localforage.setItem('replenish_skuBaseMap', JSON.parse(JSON.stringify(skuBaseMap.value))).catch(err => console.error(err));
-                    }, 800); 
-                }, { deep: true });
-
-                // 2. 销量表保存（延迟 500ms，附加数据瘦身机制，丢弃画图垃圾数据）
-                let dataSaveTimer = null;
-                watch(processedData, () => {
-                    if (dataSaveTimer) clearTimeout(dataSaveTimer);
-                    dataSaveTimer = setTimeout(() => {
-                        try {
-                            const slimData = processedData.value.map(item => {
-                                const { sparklinePoints, sparklinePath, sparklineFill, ...restToSave } = item;
-                                return restToSave;
-                            });
-                            localforage.setItem('replenish_processedData', JSON.parse(JSON.stringify(slimData))).catch(err => {
-                                console.error('IndexedDB 保存销量数据失败:', err);
-                            });
-                        } catch (error) {
-                            console.error('处理保存数据时遇到未知错误:', error);
-                        }
-                    }, 500);
-                }, { deep: true });
+                };
+                watch(processedData, saveProcessedData);
 
                 
                 // 3. 系统参数设置保存（双重存储：本地 IndexedDB + 静默实时同步至 VPS 云端）
@@ -2623,339 +2540,387 @@ const processInTransitData = (data) => {
                     skuBaseMap.value = map;
                 };
 
-                const createReactiveItem = (baseData) => {
-                    return {
-                        ...baseData,
-                        actualRestock: baseData.actualRestock || '', // 新增：实际补货量
-                        get isNewProduct() {
-                            // SKU/MSKU 可能为多店铺聚合（逗号+空格拼接多个值），需拆分后逐个匹配 skuBaseMap
-                            const candidates = [];
-                            [this.msku, this.sku].forEach(val => {
-                                if (!val) return;
-                                String(val).split(/[,，;；]/).forEach(s => {
-                                    const t = s.replace(/[\t\n\r\s]/g, '');
-                                    if (t) candidates.push(t);
-                                });
+                // --- 高性能原型定义 (所有Getter计算属性共享，零重复闭包，空setter防御性吸收赋值，阻断 deep watch 无效遍历) ---
+                const ItemPrototype = {
+                    get isNewProduct() {
+                        const candidates = [];
+                        [this.msku, this.sku].forEach(val => {
+                            if (!val) return;
+                            String(val).split(/[,，;；]/).forEach(s => {
+                                const t = s.replace(/[\t\n\r\s]/g, '');
+                                if (t) candidates.push(t);
                             });
-                            for (const cand of candidates) {
-                                const info = skuBaseMap.value[cand];
-                                if (info && info.monthsSinceCreation !== undefined && info.monthsSinceCreation <= settings.value.newProductThresholdMonths) {
-                                    return true;
-                                }
+                        });
+                        for (const cand of candidates) {
+                            const info = skuBaseMap.value[cand];
+                            if (info && info.monthsSinceCreation !== undefined && info.monthsSinceCreation <= settings.value.newProductThresholdMonths) {
+                                return true;
                             }
-                            return false;
-                        },
-                        get dailySales() {
-                            if (settings.value.salesCalcMethod === 'average') {
-                                return this.monthlySales / 30;
+                        }
+                        return false;
+                    },
+                    set isNewProduct(v) {},
+
+                    get dailySales() {
+                        if (settings.value.salesCalcMethod === 'average') {
+                            return (this.monthlySales || 0) / 30;
+                        } else {
+                            if (this.isNewProduct) {
+                                const totalW = ((settings.value.weightNew7 || 0) + (settings.value.weightNew14 || 0) + (settings.value.weightNew30 || 0)) || 100;
+                                const w7 = (settings.value.weightNew7 || 0) / totalW;
+                                const w14 = (settings.value.weightNew14 || 0) / totalW;
+                                const w30 = (settings.value.weightNew30 || 0) / totalW;
+                                return ((this.avg7 || 0) * w7) + ((this.avg14 || 0) * w14) + ((this.avg30 || 0) * w30);
                             } else {
-                                if (this.isNewProduct) {
-                                    const totalW = (settings.value.weightNew7 + settings.value.weightNew14 + settings.value.weightNew30) || 100;
-                                    const w7 = settings.value.weightNew7 / totalW;
-                                    const w14 = settings.value.weightNew14 / totalW;
-                                    const w30 = settings.value.weightNew30 / totalW;
-                                    return (this.avg7 * w7) + (this.avg14 * w14) + (this.avg30 * w30);
-                                } else {
-                                    const totalW = (settings.value.weight7 + settings.value.weight14 + settings.value.weight30) || 100;
-                                    const w7 = settings.value.weight7 / totalW;
-                                    const w14 = settings.value.weight14 / totalW;
-                                    const w30 = settings.value.weight30 / totalW;
-                                    return (this.avg7 * w7) + (this.avg14 * w14) + (this.avg30 * w30);
-                                }
+                                const totalW = ((settings.value.weight7 || 0) + (settings.value.weight14 || 0) + (settings.value.weight30 || 0)) || 100;
+                                const w7 = (settings.value.weight7 || 0) / totalW;
+                                const w14 = (settings.value.weight14 || 0) / totalW;
+                                const w30 = (settings.value.weight30 || 0) / totalW;
+                                return ((this.avg7 || 0) * w7) + ((this.avg14 || 0) * w14) + ((this.avg30 || 0) * w30);
                             }
-                        },
-                        get calculatedMonthlySales() {
-                            if (settings.value.salesCalcMethod === 'average') return this.monthlySales;
-                            return this.dailySales * 30;
-                        },
-                        get monthlySalesTooltip() {
-                            if (settings.value.salesCalcMethod === 'average') {
-                                return `原30天销量: ${this.monthlySales}`;
-                            } else {
-                                const daily = this.dailySales.toFixed(2);
-                                const isNew = this.isNewProduct;
-                                const w7 = isNew ? settings.value.weightNew7 : settings.value.weight7;
-                                const w14 = isNew ? settings.value.weightNew14 : settings.value.weight14;
-                                const w30 = isNew ? settings.value.weightNew30 : settings.value.weight30;
-                                const tag = isNew ? '新品' : '老品';
-                                return `原30天销量: ${this.monthlySales}\n加权公式(${tag}): (7天均值×${w7}% + 14天均值×${w14}% + 30天均值×${w30}%) × 30\n当前核算日均: ${daily} 个/天`;
-                            }
-                        },
-                        get availableDays() {
-                            const totalStock = (this.fbaStock || 0) + (this.onTheWay || 0);
-                            const daily = this.dailySales;
-                            return daily > 0 ? totalStock / daily : Infinity;
-                        },
-                        get triggerDays() {
-                            let days = 0;
-                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
-                                days = this.logistics === '空运' ? settings.value.uaeAirLeadTime : settings.value.uaeSeaLeadTime;
-                            } else if (this.country.includes('沙特')) {
-                                days = this.logistics === '空运' ? settings.value.ksaAirLeadTime : settings.value.ksaSeaLeadTime;
-                            }
-                            return days + settings.value.safeStock;
-                        },
-                        get airRate() {
-                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
-                                return settings.value.uaeAirFreightRate || 51.1;
-                            }
-                            return settings.value.ksaAirFreightRate || 72.45;
-                        },
-                        get seaRate() {
-                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
-                                return settings.value.uaeSeaFreightRate || 15.0;
-                            }
-                            return settings.value.ksaSeaFreightRate || 20.0;
-                        },
-                        get airLeadTime() {
-                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
-                                return settings.value.uaeAirLeadTime;
-                            }
-                            return settings.value.ksaAirLeadTime;
-                        },
-                        get seaLeadTime() {
-                            if (this.country.includes('迪拜') || this.country.includes('阿联酋')) {
-                                return settings.value.uaeSeaLeadTime;
-                            }
-                            return settings.value.ksaSeaLeadTime;
-                        },
-                        get airTriggerDays() {
-                            return this.airLeadTime + settings.value.safeStock;
-                        },
-                        get urgentAirRisk() {
-                            if (this.logistics !== '海运' || this.suggestedRestock <= 0) return false;
-                            return this.availableDays <= this.airTriggerDays || this.fbaStock === 0;
-                        },
-                        get hasValidWeight() {
-                            return this.weight !== null && this.weight !== undefined && !isNaN(this.weight) && Number(this.weight) > 0;
-                        },
-                        get hasValidVolumeWeight() {
-                            return this.volumeWeight !== null && this.volumeWeight !== undefined && !isNaN(this.volumeWeight) && Number(this.volumeWeight) > 0;
-                        },
-                        get weightErrorMsg() {
-                            const hasW = this.hasValidWeight;
-                            const hasV = this.hasValidVolumeWeight;
-                            if (!hasW && !hasV) return '缺实重与体积重(非真0)';
-                            if (!hasW) return '缺实重(非真0)';
-                            if (!hasV) return '缺体积重(非真0)';
-                            return '';
-                        },
-                        get hasWeightError() {
-                            return !!this.weightErrorMsg;
-                        },
-                        get urgentAirCostDiff() {
-                            const hasW = this.hasValidWeight;
-                            const hasV = this.hasValidVolumeWeight;
-                            const isMissingData = !hasW || !hasV;
+                        }
+                    },
+                    set dailySales(v) {},
 
-                            const w = hasW ? Number(this.weight) : 0;
-                            const v = hasV ? Number(this.volumeWeight) : (hasW ? Number(this.weight) : 0);
-                            
-                            const airPerUnit = w * this.airRate;
-                            const seaPerUnit = v * this.seaRate;
-                            const diffPerUnit = airPerUnit - seaPerUnit;
-                            const totalDiff = Math.max(0, diffPerUnit * this.suggestedRestock);
+                    get calculatedMonthlySales() {
+                        if (settings.value.salesCalcMethod === 'average') return (this.monthlySales || 0);
+                        return this.dailySales * 30;
+                    },
+                    set calculatedMonthlySales(v) {},
 
-                            return {
-                                airPerUnit,
-                                seaPerUnit,
-                                diffPerUnit,
-                                totalDiff,
-                                hasW,
-                                hasV,
-                                isMissingData
-                            };
-                        },
-                        get isOosOptimized() {
-                            return settings.value.oosOptimizationEnabled && this.fbaStock === 0;
-                        },
-                        get suggestedRestock() {
-                            const daily = this.dailySales; 
-                            if (daily <= 0) return 0;
-                            
-                            const trigger = this.triggerDays;
-                            const avail = this.availableDays;
-                            const onTheWay = this.onTheWay || 0;
-                            const calculatedMonthly = this.calculatedMonthlySales; 
+                    get monthlySalesTooltip() {
+                        if (settings.value.salesCalcMethod === 'average') {
+                            return `原30天销量: ${this.monthlySales || 0}`;
+                        } else {
+                            const daily = (this.dailySales || 0).toFixed(2);
+                            const isNew = this.isNewProduct;
+                            const w7 = isNew ? settings.value.weightNew7 : settings.value.weight7;
+                            const w14 = isNew ? settings.value.weightNew14 : settings.value.weight14;
+                            const w30 = isNew ? settings.value.weightNew30 : settings.value.weight30;
+                            const tag = isNew ? '新品' : '老品';
+                            return `原30天销量: ${this.monthlySales || 0}\n加权公式(${tag}): (7天均值×${w7}% + 14天均值×${w14}% + 30天均值×${w30}%) × 30\n当前核算日均: ${daily} 个/天`;
+                        }
+                    },
+                    set monthlySalesTooltip(v) {},
 
-                            if (this.isOosOptimized) {
-                                let suggested = 0;
-                                const method = settings.value.oosCalcMethod;
-                                if (method === 1) {
-                                    suggested = (trigger * daily) - onTheWay;
-                                } else if (method === 2) {
-                                    suggested = calculatedMonthly + (settings.value.safeStock * daily) - onTheWay;
-                                } else if (method === 3) {
-                                    suggested = calculatedMonthly - onTheWay;
-                                }
-                                return Math.max(0, Math.ceil(suggested));
+                    get availableDays() {
+                        const totalStock = (this.fbaStock || 0) + (this.onTheWay || 0);
+                        const daily = this.dailySales || 0;
+                        return daily > 0 ? totalStock / daily : Infinity;
+                    },
+                    set availableDays(v) {},
+
+                    get triggerDays() {
+                        let days = 0;
+                        const c = this.country || '';
+                        if (c.includes('迪拜') || c.includes('阿联酋')) {
+                            days = this.logistics === '空运' ? settings.value.uaeAirLeadTime : settings.value.uaeSeaLeadTime;
+                        } else if (c.includes('沙特')) {
+                            days = this.logistics === '空运' ? settings.value.ksaAirLeadTime : settings.value.ksaSeaLeadTime;
+                        }
+                        return (days || 0) + (settings.value.safeStock || 0);
+                    },
+                    set triggerDays(v) {},
+
+                    get airRate() {
+                        const c = this.country || '';
+                        if (c.includes('迪拜') || c.includes('阿联酋')) {
+                            return settings.value.uaeAirFreightRate || 51.1;
+                        }
+                        return settings.value.ksaAirFreightRate || 72.45;
+                    },
+                    set airRate(v) {},
+
+                    get seaRate() {
+                        const c = this.country || '';
+                        if (c.includes('迪拜') || c.includes('阿联酋')) {
+                            return settings.value.uaeSeaFreightRate || 15.0;
+                        }
+                        return settings.value.ksaSeaFreightRate || 20.0;
+                    },
+                    set seaRate(v) {},
+
+                    get airLeadTime() {
+                        const c = this.country || '';
+                        if (c.includes('迪拜') || c.includes('阿联酋')) {
+                            return settings.value.uaeAirLeadTime;
+                        }
+                        return settings.value.ksaAirLeadTime;
+                    },
+                    set airLeadTime(v) {},
+
+                    get seaLeadTime() {
+                        const c = this.country || '';
+                        if (c.includes('迪拜') || c.includes('阿联酋')) {
+                            return settings.value.uaeSeaLeadTime;
+                        }
+                        return settings.value.ksaSeaLeadTime;
+                    },
+                    set seaLeadTime(v) {},
+
+                    get airTriggerDays() {
+                        return (this.airLeadTime || 0) + (settings.value.safeStock || 0);
+                    },
+                    set airTriggerDays(v) {},
+
+                    get urgentAirRisk() {
+                        if (this.logistics !== '海运' || (this.suggestedRestock || 0) <= 0) return false;
+                        return this.availableDays <= this.airTriggerDays || this.fbaStock === 0;
+                    },
+                    set urgentAirRisk(v) {},
+
+                    get hasValidWeight() {
+                        return this.weight !== null && this.weight !== undefined && !isNaN(this.weight) && Number(this.weight) > 0;
+                    },
+                    set hasValidWeight(v) {},
+
+                    get hasValidVolumeWeight() {
+                        return this.volumeWeight !== null && this.volumeWeight !== undefined && !isNaN(this.volumeWeight) && Number(this.volumeWeight) > 0;
+                    },
+                    set hasValidVolumeWeight(v) {},
+
+                    get weightErrorMsg() {
+                        const hasW = this.hasValidWeight;
+                        const hasV = this.hasValidVolumeWeight;
+                        if (!hasW && !hasV) return '缺实重与体积重(非真0)';
+                        if (!hasW) return '缺实重(非真0)';
+                        if (!hasV) return '缺体积重(非真0)';
+                        return '';
+                    },
+                    set weightErrorMsg(v) {},
+
+                    get hasWeightError() {
+                        return !!this.weightErrorMsg;
+                    },
+                    set hasWeightError(v) {},
+
+                    get urgentAirCostDiff() {
+                        const hasW = this.hasValidWeight;
+                        const hasV = this.hasValidVolumeWeight;
+                        const isMissingData = !hasW || !hasV;
+                        const w = hasW ? Number(this.weight) : 0;
+                        const v = hasV ? Number(this.volumeWeight) : (hasW ? Number(this.weight) : 0);
+                        
+                        const airPerUnit = w * (this.airRate || 0);
+                        const seaPerUnit = v * (this.seaRate || 0);
+                        const diffPerUnit = airPerUnit - seaPerUnit;
+                        const totalDiff = Math.max(0, diffPerUnit * (this.suggestedRestock || 0));
+
+                        return {
+                            airPerUnit,
+                            seaPerUnit,
+                            diffPerUnit,
+                            totalDiff,
+                            hasW,
+                            hasV,
+                            isMissingData
+                        };
+                    },
+                    set urgentAirCostDiff(v) {},
+
+                    get isOosOptimized() {
+                        return Boolean(settings.value.oosOptimizationEnabled && this.fbaStock === 0);
+                    },
+                    set isOosOptimized(v) {},
+
+                    get suggestedRestock() {
+                        const daily = this.dailySales || 0; 
+                        if (daily <= 0) return 0;
+                        
+                        const trigger = this.triggerDays || 0;
+                        const avail = this.availableDays || 0;
+                        const onTheWay = this.onTheWay || 0;
+                        const calculatedMonthly = this.calculatedMonthlySales || 0; 
+
+                        if (this.isOosOptimized) {
+                            let suggested = 0;
+                            const method = settings.value.oosCalcMethod;
+                            if (method === 1) {
+                                suggested = (trigger * daily) - onTheWay;
+                            } else if (method === 2) {
+                                suggested = calculatedMonthly + ((settings.value.safeStock || 0) * daily) - onTheWay;
+                            } else if (method === 3) {
+                                suggested = calculatedMonthly - onTheWay;
                             }
+                            return Math.max(0, Math.ceil(suggested || 0));
+                        }
 
-                            if (avail <= trigger) {
-                                const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
-                                return Math.max(0, Math.ceil((trigger - avail + base) * daily));
+                        if (avail <= trigger) {
+                            const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
+                            return Math.max(0, Math.ceil((trigger - avail + (base || 0)) * daily));
+                        }
+                        return 0;
+                    },
+                    set suggestedRestock(v) {},
+
+                    get restockTooltip() {
+                        const daily = this.dailySales || 0;
+                        const trigger = this.triggerDays || 0;
+                        const avail = this.availableDays || 0;
+                        const onTheWay = this.onTheWay || 0;
+                        const monthly = this.calculatedMonthlySales || 0; 
+                        const restock = this.suggestedRestock || 0;
+
+                        let prefixStr = '';
+                        if (this.logistics === '空海结合') {
+                            const airRatio = (settings.value.airSeaRatio || 0) / 100;
+                            const seaRatio = 1 - airRatio;
+                            const airQty = Math.round(restock * airRatio);
+                            const seaQty = Math.round(restock * seaRatio);
+                            prefixStr = `空运：${airQty} 个  海运：${seaQty} 个\n====================\n`;
+                        }
+
+                        if (this.isOosOptimized) {
+                            const method = settings.value.oosCalcMethod;
+                            let mathStr = '';
+                            if(method === 1) {
+                                mathStr = `(${trigger}天) × ${daily.toFixed(2)} - ${onTheWay} = ${restock}`;
+                            } else if(method === 2) {
+                                mathStr = `${Math.round(monthly)} + (${settings.value.safeStock}天 × ${daily.toFixed(2)}) - ${onTheWay} = ${restock}`;
+                            } else if(method === 3) {
+                                mathStr = `${Math.round(monthly)} - ${onTheWay} = ${restock}`;
                             }
-                            return 0;
-                        },
-                        get restockTooltip() {
-                            const daily = this.dailySales;
-                            const trigger = this.triggerDays;
-                            const avail = this.availableDays;
-                            const onTheWay = this.onTheWay || 0;
-                            const monthly = this.calculatedMonthlySales; 
-                            const restock = this.suggestedRestock;
+                            return `${prefixStr}【断货优化计算过程】\n${mathStr}`;
+                        }
 
-                            let prefixStr = '';
-                                if (this.logistics === '空海结合') {
-                                    const airRatio = settings.value.airSeaRatio / 100;
-                                    const seaRatio = 1 - airRatio;
-                                    const airQty = Math.round(restock * airRatio);
-                                    const seaQty = Math.round(restock * seaRatio);
-                                    prefixStr = `空运：${airQty} 个  海运：${seaQty} 个\n====================\n`;
-                                }
+                        if (avail <= trigger) {
+                            const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
+                            let mathStr = `(${trigger}天 - ${avail.toFixed(1)}天 + ${base}天) × ${daily.toFixed(2)} = ${restock}`;
+                            return `${prefixStr}【常规补货计算过程】\n${mathStr}`;
+                        }
+                        return this.logistics === '空海结合' ? `${prefixStr}库存充足，暂无需补货` : `库存充足，暂无需补货`;
+                    },
+                    set restockTooltip(v) {},
 
-                            if (this.isOosOptimized) {
-                                const method = settings.value.oosCalcMethod;
-                                let mathStr = '';
-                                if(method === 1) {
-                                    mathStr = `(${trigger}天) × ${daily.toFixed(2)} - ${onTheWay} = ${restock}`;
-                                } else if(method === 2) {
-                                    mathStr = `${Math.round(monthly)} + (${settings.value.safeStock}天 × ${daily.toFixed(2)}) - ${onTheWay} = ${restock}`;
-                                } else if(method === 3) {
-                                    mathStr = `${Math.round(monthly)} - ${onTheWay} = ${restock}`;
-                                }
-                                return `${prefixStr}【断货优化计算过程】\n${mathStr}`;
-                            }
+                    get isHighVolatile() {
+                        if (!this.salesTrend || this.salesTrend.length === 0) return false;
+                        const maxDaily = Math.max(...this.salesTrend.map(s => s.val || 0));
+                        const calcMonthly = this.calculatedMonthlySales || 0;
+                        if(calcMonthly < 5) return false; 
+                        return ((maxDaily / calcMonthly) * 100) >= settings.value.volatilityThreshold;
+                    },
+                    set isHighVolatile(v) {},
 
-                            if (avail <= trigger) {
-                                const base = this.itemType === '爆款' ? settings.value.baoRestockDays : (this.itemType === '旺款' ? settings.value.wangRestockDays : settings.value.normalRestockDays);
-                                let mathStr = `(${trigger}天 - ${avail.toFixed(1)}天 + ${base}天) × ${daily.toFixed(2)} = ${restock}`;
-                                return `${prefixStr}【常规补货计算过程】\n${mathStr}`;
-                            }
-                            return this.logistics === '空海结合' ? `${prefixStr}库存充足，暂无需补货` : `库存充足，暂无需补货`;
-                        },
-                        get isHighVolatile() {
-                            if (!this.salesTrend || this.salesTrend.length === 0) return false;
-                            const maxDaily = Math.max(...this.salesTrend.map(s => s.val));
-                            const calcMonthly = this.calculatedMonthlySales;
-                            if(calcMonthly < 5) return false; 
-                            return ((maxDaily / calcMonthly) * 100) >= settings.value.volatilityThreshold;
-                        },
-                        get matchedCostInfo() {
-                            let warehouseCosts = {};
-                            const candidates = [];
-                            [this.sku, this.msku, this.primaryMsku].forEach(val => {
-                                if (!val) return;
-                                String(val).split(/[,，;；]/).forEach(s => {
-                                    const t = s.replace(/[\t\n\r\s]/g, '').trim().toUpperCase();
-                                    if (t && !candidates.includes(t)) candidates.push(t);
-                                });
+                    get matchedCostInfo() {
+                        let warehouseCosts = {};
+                        const candidates = [];
+                        [this.sku, this.msku, this.primaryMsku].forEach(val => {
+                            if (!val) return;
+                            String(val).split(/[,，;；]/).forEach(s => {
+                                const t = s.replace(/[\t\n\r\s]/g, '').trim().toUpperCase();
+                                if (t && !candidates.includes(t)) candidates.push(t);
                             });
+                        });
 
-                            for (const c of candidates) {
-                                const info = skuBaseMap.value[c];
-                                if (info && info.warehouseCosts && Object.keys(info.warehouseCosts).length > 0) {
-                                    warehouseCosts = info.warehouseCosts;
-                                    break;
-                                }
+                        for (const c of candidates) {
+                            const info = skuBaseMap.value[c];
+                            if (info && info.warehouseCosts && Object.keys(info.warehouseCosts).length > 0) {
+                                warehouseCosts = info.warehouseCosts;
+                                break;
                             }
+                        }
 
-                            const country = String(this.country || '');
-                            const msku = String(this.primaryMsku || this.msku || '').toUpperCase();
-                            const store = String(this.primaryStore || this.store || '').toUpperCase();
-                            const isSF = msku.includes('SF');
+                        const country = String(this.country || '');
+                        const msku = String(this.primaryMsku || this.msku || '').toUpperCase();
+                        const store = String(this.primaryStore || this.store || '').toUpperCase();
+                        const isSF = msku.includes('SF');
 
-                            let targetWh = '';
-                            let costType = isSF ? 'SF' : 'FBA';
+                        let targetWh = '';
+                        let costType = isSF ? 'SF' : 'FBA';
 
-                            // 1. 沙特(跨国) 按 迪拜 匹配
-                            const isDubai = country.includes('迪拜') || country.includes('阿联酋') || country.includes('跨国');
-                            const isSaudi = country.includes('沙特') && !country.includes('跨国');
+                        // 1. 沙特(跨国) 按 迪拜 匹配
+                        const isDubai = country.includes('迪拜') || country.includes('阿联酋') || country.includes('跨国');
+                        const isSaudi = country.includes('沙特') && !country.includes('跨国');
 
-                            if (isDubai) {
-                                if (isSF) {
-                                    targetWh = '迪拜W18-SF仓';
-                                    costType = 'SF';
-                                } else {
-                                    targetWh = '迪拜FBA仓';
-                                    costType = 'FBA';
-                                }
-                            } else if (isSaudi) {
-                                if (!isSF) {
-                                    targetWh = '沙特FBA仓';
-                                    costType = 'FBA';
-                                } else {
-                                    costType = 'SF';
-                                    if (store.includes('A064') || store.includes('A286') || store.includes('KSA-A064') || store.includes('KSA-A286')) {
-                                        targetWh = '沙特YB-SF仓';
-                                    } else if (store.includes('A186') || store.includes('KSA-A186')) {
-                                        targetWh = '沙特老-SF仓';
-                                    } else {
-                                        targetWh = '沙特YB-SF仓';
-                                    }
-                                }
-                            }
-
-                            let cost = null;
-                            let usedWarehouse = targetWh;
-                            let isFallback = false;
-
-                            if (targetWh && warehouseCosts[targetWh] !== undefined && warehouseCosts[targetWh] > 0) {
-                                cost = warehouseCosts[targetWh];
+                        if (isDubai) {
+                            if (isSF) {
+                                targetWh = '迪拜W18-SF仓';
+                                costType = 'SF';
                             } else {
-                                // 1. 对应国家的 FBA 仓与 SF 仓候选定义
-                                const fbaWh = isDubai ? '迪拜FBA仓' : (isSaudi ? '沙特FBA仓' : '');
-                                const sfCandidates = isDubai ? ['迪拜W18-SF仓'] : (isSaudi ? ['沙特YB-SF仓', '沙特老-SF仓'] : []);
-
-                                // 2. 若为 SF 模式且 SF 目标仓无成本，优先借用对应国家的 FBA 仓
-                                if (isSF && fbaWh && warehouseCosts[fbaWh] !== undefined && warehouseCosts[fbaWh] > 0) {
-                                    cost = warehouseCosts[fbaWh];
-                                    usedWarehouse = fbaWh;
-                                    isFallback = true;
-                                } else if (!isSF && sfCandidates.length > 0 && sfCandidates.some(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0)) {
-                                    // 3. 新增：若为 FBA 模式且 FBA 目标仓无成本，优先借用对应国家的 SF 仓
-                                    const hitSfWh = sfCandidates.find(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0);
-                                    cost = warehouseCosts[hitSfWh];
-                                    usedWarehouse = hitSfWh;
-                                    isFallback = true;
-                                } else if (warehouseCosts['深圳仓'] !== undefined && warehouseCosts['深圳仓'] > 0) {
-                                    // 4. 深圳仓保底
-                                    cost = warehouseCosts['深圳仓'];
-                                    usedWarehouse = '深圳仓';
-                                    isFallback = true;
+                                targetWh = '迪拜FBA仓';
+                                costType = 'FBA';
+                            }
+                        } else if (isSaudi) {
+                            if (!isSF) {
+                                targetWh = '沙特FBA仓';
+                                costType = 'FBA';
+                            } else {
+                                costType = 'SF';
+                                if (store.includes('A064') || store.includes('A286') || store.includes('KSA-A064') || store.includes('KSA-A286')) {
+                                    targetWh = '沙特YB-SF仓';
+                                } else if (store.includes('A186') || store.includes('KSA-A186')) {
+                                    targetWh = '沙特老-SF仓';
                                 } else {
-                                    // 5. 该 SKU 名下任意有效仓保底
-                                    const validWhKeys = Object.keys(warehouseCosts);
-                                    if (validWhKeys.length > 0) {
-                                        usedWarehouse = validWhKeys[0];
-                                        cost = warehouseCosts[usedWarehouse];
-                                        isFallback = true;
-                                    }
+                                    targetWh = '沙特YB-SF仓';
                                 }
                             }
+                        }
 
-                            return {
-                                cost: cost,
-                                targetWarehouse: targetWh,
-                                usedWarehouse: usedWarehouse,
-                                costType: costType,
-                                isFallback: isFallback,
-                                allCosts: warehouseCosts
-                            };
-                        },
-                        get skuCost() {
-                            return this.matchedCostInfo.cost;
-                        },
-                        get lossWarning() {
-                            const price = this.price;
-                            const costInfo = this.matchedCostInfo;
-                            const cost = costInfo.cost;
-                            if (price === null || price === undefined || isNaN(price) || cost === null || cost === undefined || isNaN(cost)) {
-                                return { isLoss: false, diff: null, threshold: null, costType: costInfo.costType, message: '' };
+                        let cost = null;
+                        let usedWarehouse = targetWh;
+                        let isFallback = false;
+
+                        if (targetWh && warehouseCosts[targetWh] !== undefined && warehouseCosts[targetWh] > 0) {
+                            cost = warehouseCosts[targetWh];
+                        } else {
+                            // 1. 对应国家的 FBA 仓与 SF 仓候选定义
+                            const fbaWh = isDubai ? '迪拜FBA仓' : (isSaudi ? '沙特FBA仓' : '');
+                            const sfCandidates = isDubai ? ['迪拜W18-SF仓'] : (isSaudi ? ['沙特YB-SF仓', '沙特老-SF仓'] : []);
+
+                            // 2. 若为 SF 模式且 SF 目标仓无成本，优先借用对应国家的 FBA 仓
+                            if (isSF && fbaWh && warehouseCosts[fbaWh] !== undefined && warehouseCosts[fbaWh] > 0) {
+                                cost = warehouseCosts[fbaWh];
+                                usedWarehouse = fbaWh;
+                                isFallback = true;
+                            } else if (!isSF && sfCandidates.length > 0 && sfCandidates.some(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0)) {
+                                // 3. 若为 FBA 模式且 FBA 目标仓无成本，优先借用对应国家的 SF 仓
+                                const hitSfWh = sfCandidates.find(wh => warehouseCosts[wh] !== undefined && warehouseCosts[wh] > 0);
+                                cost = warehouseCosts[hitSfWh];
+                                usedWarehouse = hitSfWh;
+                                isFallback = true;
+                            } else if (warehouseCosts['深圳仓'] !== undefined && warehouseCosts['深圳仓'] > 0) {
+                                // 4. 深圳仓保底
+                                cost = warehouseCosts['深圳仓'];
+                                usedWarehouse = '深圳仓';
+                                isFallback = true;
+                            } else {
+                                // 5. 该 SKU 名下任意有效仓保底
+                                const validWhKeys = Object.keys(warehouseCosts);
+                                if (validWhKeys.length > 0) {
+                                    usedWarehouse = validWhKeys[0];
+                                    cost = warehouseCosts[usedWarehouse];
+                                    isFallback = true;
+                                }
                             }
+                        }
+
+                        return {
+                            cost: cost,
+                            targetWarehouse: targetWh,
+                            usedWarehouse: usedWarehouse,
+                            costType: costType,
+                            isFallback: isFallback,
+                            allCosts: warehouseCosts
+                        };
+                    },
+                    set matchedCostInfo(v) {},
+
+                    get skuCost() {
+                        return this.matchedCostInfo.cost;
+                    },
+                    set skuCost(v) {},
+
+                    get lossWarning() {
+                        const price = this.price;
+                        const costInfo = this.matchedCostInfo;
+                        const cost = costInfo.cost;
+                        const fbaTh = (settings.value.fbaLossThreshold !== undefined && settings.value.fbaLossThreshold !== null && !isNaN(settings.value.fbaLossThreshold)) ? Number(settings.value.fbaLossThreshold) : 10;
+                        const sfTh = (settings.value.sfLossThreshold !== undefined && settings.value.sfLossThreshold !== null && !isNaN(settings.value.sfLossThreshold)) ? Number(settings.value.sfLossThreshold) : 12;
+
+                        if (price === null || price === undefined || isNaN(price) || cost === null || cost === undefined || isNaN(cost)) {
+                            return { isLoss: false, diff: null, threshold: null, costType: costInfo.costType, message: '' };
+                        } else {
                             const diff = price - cost;
-                            const fbaTh = (settings.value.fbaLossThreshold !== undefined && settings.value.fbaLossThreshold !== null && !isNaN(settings.value.fbaLossThreshold)) ? Number(settings.value.fbaLossThreshold) : 10;
-                            const sfTh = (settings.value.sfLossThreshold !== undefined && settings.value.sfLossThreshold !== null && !isNaN(settings.value.sfLossThreshold)) ? Number(settings.value.sfLossThreshold) : 12;
                             const threshold = costInfo.costType === 'SF' ? sfTh : fbaTh;
                             const isLoss = diff < threshold;
                             return {
@@ -2966,7 +2931,20 @@ const processInTransitData = (data) => {
                                 message: isLoss ? '⚠️ 留意是否亏本' : ''
                             };
                         }
-                    };
+                    },
+                    set lossWarning(v) {}
+                };
+
+                const createReactiveItem = (baseData) => {
+                    const item = Object.create(ItemPrototype);
+                    for (const key of Object.keys(baseData)) {
+                        // 彻底阻断来自旧缓存的同名 getter 静态值，防止给只读属性赋值报错或污染动态计算
+                        if (!(key in ItemPrototype)) {
+                            item[key] = baseData[key];
+                        }
+                    }
+                    item.actualRestock = baseData.actualRestock || '';
+                    return item;
                 };
 
                 // 智能从文本 (如 MSKU) 中提取马帮库存 SKU：
@@ -3697,7 +3675,8 @@ const exportExcel = () => {
                     filterNewProduct,
                     getAmazonUrl,
                     getWarehouseCostTooltip,
-                    formatSkuCost
+                    formatSkuCost,
+                    saveProcessedData
                 };
             }
         });
