@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.6.3</title>
+    <title>智能补货辅助系统 v4.6.4</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 (内联离线版本，100% 秒开杜绝白屏) -->
@@ -1264,7 +1264,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.6.3';
+        const CURRENT_VERSION = '4.6.4';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1791,8 +1791,54 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                 };
 
 // --- 替换整个 onMounted 代码块 ---
-                // ==================== 云端集中管控与身份鉴权 (持久化 & 每次打开联网同步) ====================
-                const API_SERVER_URL = 'http://86.53.163.182:8880/api';
+                // ==================== 云端集中管控与高可用智能双通道网络请求 ====================
+                // 主入口：合法 HTTPS 域名 (防浏览器拦截 + 全球加速)
+                const PRIMARY_API_URL = 'https://86.53.163.182.sslip.io/api';
+                // 备用兜底入口：直连原始 IP + 端口 (无缝兜底)
+                const FALLBACK_API_URL = 'http://86.53.163.182:8880/api';
+                // 当前优先使用的网关
+                let activeApiUrl = PRIMARY_API_URL;
+
+                /**
+                 * 智能双通道 + 自动重试请求器
+                 * 优先尝试主通道(HTTPS)，失败自动多重试几次，若不可用平滑降级切换至备用通道(HTTP)兜底
+                 */
+                const apiRequestWithRetry = async (path, options = {}, maxRetriesPerUrl = 2) => {
+                    const targets = activeApiUrl === PRIMARY_API_URL 
+                        ? [PRIMARY_API_URL, FALLBACK_API_URL] 
+                        : [FALLBACK_API_URL, PRIMARY_API_URL];
+
+                    let lastError = null;
+
+                    for (const baseUrl of targets) {
+                        for (let attempt = 1; attempt <= maxRetriesPerUrl; attempt++) {
+                            try {
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+                                const finalOptions = {
+                                    ...options,
+                                    signal: controller.signal
+                                };
+
+                                const fullUrl = `${baseUrl}${path}`;
+                                const res = await fetch(fullUrl, finalOptions);
+                                clearTimeout(timeoutId);
+
+                                const data = await res.json();
+                                activeApiUrl = baseUrl;
+                                return { res, data };
+                            } catch (err) {
+                                lastError = err;
+                                console.warn(`[API] 请求 ${baseUrl}${path} 第 ${attempt} 次失败:`, err.message || err);
+                                if (attempt < maxRetriesPerUrl) {
+                                    await new Promise(resolve => setTimeout(resolve, 400));
+                                }
+                            }
+                        }
+                    }
+                    throw lastError || new Error('所有通道连接失败，请检查网络');
+                };
                 const isUserLoggedIn = ref(false);
                 const currentUser = ref({ username: '', team: '' });
                 const userToken = ref('');
@@ -1833,10 +1879,9 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     if (!userToken.value) return;
                     syncStatus.value = 'syncing';
                     try {
-                        const res = await fetch(`${API_SERVER_URL}/user/settings`, {
+                        const { res, data } = await apiRequestWithRetry('/user/settings', {
                             headers: { 'Authorization': 'Bearer ' + userToken.value }
                         });
-                        const data = await res.json();
 console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                         if (data.success) {
                             lockedFields.value = data.locked_fields || [];
@@ -1882,7 +1927,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                     userLoginLoading.value = true;
                     userLoginError.value = '';
                     try {
-                        const res = await fetch(`${API_SERVER_URL}/auth/login`, {
+                        const { res, data } = await apiRequestWithRetry('/auth/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -1891,7 +1936,6 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                                 version: CURRENT_VERSION
                             })
                         });
-                        const data = await res.json();
                         if (data.success) {
                             userToken.value = data.token;
                             currentUser.value = data.user;
@@ -1960,7 +2004,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                         // 3. 立即向云端上传并同步
                         if (isUserLoggedIn.value && userToken.value) {
                             syncStatus.value = 'syncing';
-                            const res = await fetch(`${API_SERVER_URL}/user/sync-settings`, {
+                            const { res, data } = await apiRequestWithRetry('/user/sync-settings', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -1968,7 +2012,6 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                                 },
                                 body: JSON.stringify({ settings: settings.value })
                             });
-                            const data = await res.json();
                             if (data.success) {
                                 syncStatus.value = 'synced';
                                 const now = new Date();
@@ -2018,7 +2061,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                     changePwdError.value = '';
                     changePwdSuccess.value = '';
                     try {
-                        const res = await fetch(`${API_SERVER_URL}/auth/change-password`, {
+                        const { res, data } = await apiRequestWithRetry('/auth/change-password', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2029,7 +2072,6 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                                 new_password: changePwdForm.value.newPassword
                             })
                         });
-                        const data = await res.json();
                         if (data.success) {
                             changePwdSuccess.value = data.message;
                             setTimeout(() => {
@@ -2209,7 +2251,7 @@ let settingsSaveTimer = null;
                         if (isUserLoggedIn.value && userToken.value) {
                             syncStatus.value = 'syncing';
                             try {
-                                const res = await fetch(`${API_SERVER_URL}/user/sync-settings`, {
+                                const { res, data } = await apiRequestWithRetry('/user/sync-settings', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
@@ -2217,7 +2259,6 @@ let settingsSaveTimer = null;
                                     },
                                     body: JSON.stringify({ settings: val })
                                 });
-                                const data = await res.json();
                                 if (data.success) {
                                     syncStatus.value = 'synced';
                                     const now = new Date();

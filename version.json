@@ -1,10 +1,11 @@
 {
-  "version": "4.6.3",
+  "version": "4.6.4",
   "releaseDate": "2026-11-09",
-  "title": "v4.6.3 优化计算性能减少卡顿版",
+  "title": "v4.6.4 HTTPS双通道高可用与登录防抖重试版",
   "changelog": [
-    "1、优化计算性能，减少卡顿"
+    "1、新增 HTTPS 域名通道与多重试机制，彻底解决偶发的网络 Failed to fetch 故障",
+    "2、保留原始 IP:8880 入口作为安全兜底，双通道无缝自动故障转移"
   ],
   "forceUpdate": false,
-  "downloadFileName": "补货辅助系统4.6.3.html"
+  "downloadFileName": "补货辅助系统4.6.4.html"
 }
