@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.6.4</title>
+    <title>智能补货辅助系统 v4.6.5</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 (内联离线版本，100% 秒开杜绝白屏) -->
@@ -1066,7 +1066,14 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     </div>
 
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">物流与缓冲时间 (天)</h3>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">物流与缓冲时间 (天)</h3>
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                                <span class="text-xs font-bold transition-colors" :class="settings.newProductLeadTimeEnabled ? 'text-indigo-600 font-extrabold' : 'text-slate-500'">新品单独方案</span>
+                                <input type="checkbox" v-model="settings.newProductLeadTimeEnabled" :disabled="isFieldLocked('safeStock')" class="sr-only peer">
+                                <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 transition-colors relative"></div>
+                            </label>
+                        </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div><label class="text-xs text-slate-600">迪拜空运</label><input type="number" v-model.number="settings.uaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
                             <div><label class="text-xs text-slate-600">沙特空运</label><input type="number" v-model.number="settings.ksaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
@@ -1078,6 +1085,41 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                     <span v-if="isFieldLocked('safeStock')" class="text-[9px] bg-red-100 text-red-600 px-1 rounded font-bold">🔒已被管理员锁定</span>
                                 </div>
                                 <input type="number" v-model.number="settings.safeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-indigo-50 text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold">
+                            </div>
+                        </div>
+
+                        <!-- 开启新品单独方案后展示的新品专属输入位置 -->
+                        <div v-if="settings.newProductLeadTimeEnabled" class="mt-3 p-3 bg-indigo-50/80 rounded-xl border border-indigo-200/80 transition-all">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                                    新品专属物流与缓冲 (仅对新品SKU生效)
+                                </span>
+                                <span v-if="isFieldLocked('safeStock')" class="text-[9px] bg-red-100 text-red-600 px-1 rounded font-bold">🔒锁定</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label class="text-[11px] text-slate-600 font-medium">新品迪拜空运</label>
+                                    <input type="number" v-model.number="settings.newProductUaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] text-slate-600 font-medium">新品沙特空运</label>
+                                    <input type="number" v-model.number="settings.newProductKsaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] text-slate-600 font-medium">新品迪拜海运</label>
+                                    <input type="number" v-model.number="settings.newProductUaeSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                </div>
+                                <div>
+                                    <label class="text-[11px] text-slate-600 font-medium">新品沙特海运</label>
+                                    <input type="number" v-model.number="settings.newProductKsaSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                </div>
+                                <div class="col-span-2">
+                                    <div class="flex justify-between items-center">
+                                        <label class="text-[11px] text-indigo-800 font-bold">新品安全库存缓冲 (天)</label>
+                                    </div>
+                                    <input type="number" v-model.number="settings.newProductSafeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-900'" class="w-full mt-1 border border-indigo-300 rounded p-1.5 text-sm text-center font-bold">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1264,7 +1306,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.6.4';
+        const CURRENT_VERSION = '4.6.5';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1735,6 +1777,13 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     uaeSeaLeadTime: 35,
                     ksaSeaLeadTime: 35,
                     safeStock: 10,
+                    // 2.1 新品单独方案参数
+                    newProductLeadTimeEnabled: false,
+                    newProductSafeStock: 10,
+                    newProductUaeAirLeadTime: 15,
+                    newProductKsaAirLeadTime: 15,
+                    newProductUaeSeaLeadTime: 35,
+                    newProductKsaSeaLeadTime: 35,
                     baoRestockDays: 15,    // 爆款补货天数
                     wangRestockDays: 15,   // 旺款补货天数
                     normalRestockDays: 30, // 平款补货天数
@@ -2651,15 +2700,30 @@ const processInTransitData = (data) => {
                     },
                     set availableDays(v) {},
 
+                    get effectiveLeadTimes() {
+                        const s = settings.value;
+                        const isNew = Boolean(this.isNewProduct && s.newProductLeadTimeEnabled);
+                        return {
+                            isNew,
+                            uaeAir: isNew ? (s.newProductUaeAirLeadTime ?? s.uaeAirLeadTime) : s.uaeAirLeadTime,
+                            ksaAir: isNew ? (s.newProductKsaAirLeadTime ?? s.ksaAirLeadTime) : s.ksaAirLeadTime,
+                            uaeSea: isNew ? (s.newProductUaeSeaLeadTime ?? s.uaeSeaLeadTime) : s.uaeSeaLeadTime,
+                            ksaSea: isNew ? (s.newProductKsaSeaLeadTime ?? s.ksaSeaLeadTime) : s.ksaSeaLeadTime,
+                            safeStock: isNew ? (s.newProductSafeStock ?? s.safeStock) : s.safeStock
+                        };
+                    },
+                    set effectiveLeadTimes(v) {},
+
                     get triggerDays() {
                         let days = 0;
                         const c = this.country || '';
+                        const lt = this.effectiveLeadTimes;
                         if (c.includes('迪拜') || c.includes('阿联酋')) {
-                            days = this.logistics === '空运' ? settings.value.uaeAirLeadTime : settings.value.uaeSeaLeadTime;
+                            days = this.logistics === '空运' ? lt.uaeAir : lt.uaeSea;
                         } else if (c.includes('沙特')) {
-                            days = this.logistics === '空运' ? settings.value.ksaAirLeadTime : settings.value.ksaSeaLeadTime;
+                            days = this.logistics === '空运' ? lt.ksaAir : lt.ksaSea;
                         }
-                        return (days || 0) + (settings.value.safeStock || 0);
+                        return (days || 0) + (lt.safeStock || 0);
                     },
                     set triggerDays(v) {},
 
@@ -2683,24 +2747,26 @@ const processInTransitData = (data) => {
 
                     get airLeadTime() {
                         const c = this.country || '';
+                        const lt = this.effectiveLeadTimes;
                         if (c.includes('迪拜') || c.includes('阿联酋')) {
-                            return settings.value.uaeAirLeadTime;
+                            return lt.uaeAir;
                         }
-                        return settings.value.ksaAirLeadTime;
+                        return lt.ksaAir;
                     },
                     set airLeadTime(v) {},
 
                     get seaLeadTime() {
                         const c = this.country || '';
+                        const lt = this.effectiveLeadTimes;
                         if (c.includes('迪拜') || c.includes('阿联酋')) {
-                            return settings.value.uaeSeaLeadTime;
+                            return lt.uaeSea;
                         }
-                        return settings.value.ksaSeaLeadTime;
+                        return lt.ksaSea;
                     },
                     set seaLeadTime(v) {},
 
                     get airTriggerDays() {
-                        return (this.airLeadTime || 0) + (settings.value.safeStock || 0);
+                        return (this.airLeadTime || 0) + (this.effectiveLeadTimes.safeStock || 0);
                     },
                     set airTriggerDays(v) {},
 
@@ -2779,7 +2845,7 @@ const processInTransitData = (data) => {
                             if (method === 1) {
                                 suggested = (trigger * daily) - onTheWay;
                             } else if (method === 2) {
-                                suggested = calculatedMonthly + ((settings.value.safeStock || 0) * daily) - onTheWay;
+                                suggested = calculatedMonthly + ((this.effectiveLeadTimes.safeStock || 0) * daily) - onTheWay;
                             } else if (method === 3) {
                                 suggested = calculatedMonthly - onTheWay;
                             }
@@ -2817,7 +2883,9 @@ const processInTransitData = (data) => {
                             if(method === 1) {
                                 mathStr = `(${trigger}天) × ${daily.toFixed(2)} - ${onTheWay} = ${restock}`;
                             } else if(method === 2) {
-                                mathStr = `${Math.round(monthly)} + (${settings.value.safeStock}天 × ${daily.toFixed(2)}) - ${onTheWay} = ${restock}`;
+                                const effSafe = this.effectiveLeadTimes.safeStock || 0;
+                                const planTag = this.effectiveLeadTimes.isNew ? '[新品方案] ' : '';
+                                mathStr = `${planTag}${Math.round(monthly)} + (${effSafe}天 × ${daily.toFixed(2)}) - ${onTheWay} = ${restock}`;
                             } else if(method === 3) {
                                 mathStr = `${Math.round(monthly)} - ${onTheWay} = ${restock}`;
                             }
