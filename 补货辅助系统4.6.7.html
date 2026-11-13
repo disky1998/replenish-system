@@ -961,7 +961,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                         <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                         算法参数与系统设置
                     </h2>
-                    <button @click="showSettings = false" class="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-slate-200">
+                    <button @click="handleCloseSettings" class="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-slate-200" title="关闭设置">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
@@ -1006,21 +1006,21 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                 开启断货 SKU 补货优化 (FBA在售为0)
                             </h3>
                             <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" :disabled="isFieldLocked('oosOptimizationEnabled')" v-model="settings.oosOptimizationEnabled" class="sr-only peer">
+                                <input type="checkbox" :disabled="isFieldLocked('oosOptimizationEnabled')" v-model="tempSettings.oosOptimizationEnabled" class="sr-only peer">
                                 <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
                             </label>
                         </div>
-                        <div v-if="settings.oosOptimizationEnabled" class="flex flex-col gap-2 mt-2 pt-3 border-t border-red-100/50">
+                        <div v-if="tempSettings.oosOptimizationEnabled" class="flex flex-col gap-2 mt-2 pt-3 border-t border-red-100/50">
                             <label class="flex items-start gap-2 cursor-pointer">
-                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="settings.oosCalcMethod" :value="1" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="tempSettings.oosCalcMethod" :value="1" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
                                 <span class="text-xs text-slate-700 leading-tight font-medium">物流时间 + 安全缓冲 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">仅补足警戒水位：(物流天数+安全天数)×日销 - 在途</span></span>
                             </label>
                             <label class="flex items-start gap-2 cursor-pointer">
-                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="settings.oosCalcMethod" :value="2" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="tempSettings.oosCalcMethod" :value="2" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
                                 <span class="text-xs text-slate-700 leading-tight font-medium">月销量 + 安全缓冲 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">月销垫底：月销量 + (安全天数×日销) - 在途</span></span>
                             </label>
                             <label class="flex items-start gap-2 cursor-pointer">
-                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="settings.oosCalcMethod" :value="3" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
+                                <input type="radio" :disabled="isFieldLocked('oosCalcMethod')" v-model="tempSettings.oosCalcMethod" :value="3" class="mt-0.5 w-3.5 h-3.5 text-red-600 focus:ring-red-500">
                                 <span class="text-xs text-slate-700 leading-tight font-medium">月销量 - 采购在途<br><span class="text-[10px] font-normal text-slate-400">极简保守：月销量 - 在途</span></span>
                             </label>
                         </div>
@@ -1035,39 +1035,39 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                             <div class="flex flex-col gap-1">
                                 <div class="flex justify-between items-center">
                                     <span class="text-xs font-medium text-slate-600">SKU 新品判定时间</span>
-                                    <span class="text-xs font-bold text-indigo-600">{{ settings.newProductThresholdMonths }} 个月内</span>
+                                    <span class="text-xs font-bold text-indigo-600">{{ tempSettings.newProductThresholdMonths }} 个月内</span>
                                 </div>
-                                <input type="range" :disabled="isFieldLocked('newProductThresholdMonths')" :class="isFieldLocked('newProductThresholdMonths') ? 'opacity-50 cursor-not-allowed' : ''" v-model.number="settings.newProductThresholdMonths" min="3" max="24" step="1" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                                <input type="range" :disabled="isFieldLocked('newProductThresholdMonths')" :class="isFieldLocked('newProductThresholdMonths') ? 'opacity-50 cursor-not-allowed' : ''" v-model.number="tempSettings.newProductThresholdMonths" min="3" max="24" step="1" class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500">
                             </div>
 
                             <label class="flex items-center gap-2 cursor-pointer mt-1" :class="isFieldLocked('salesCalcMethod') ? 'opacity-60 cursor-not-allowed' : ''">
-                                <input type="radio" v-model="settings.salesCalcMethod" value="average" :disabled="isFieldLocked('salesCalcMethod')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                                <input type="radio" v-model="tempSettings.salesCalcMethod" value="average" :disabled="isFieldLocked('salesCalcMethod')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
                                 <span class="text-sm text-slate-700 font-medium">常规均值法 <span class="text-xs font-normal text-slate-400 block">(近30天总销量 ÷ 30)</span></span>
                                 <span v-if="isFieldLocked('salesCalcMethod')" class="text-[9px] bg-red-100 text-red-600 px-1 rounded font-bold">🔒锁定</span>
                             </label>
                             <label class="flex items-center gap-2 cursor-pointer" :class="isFieldLocked('salesCalcMethod') ? 'opacity-90' : ''">
-                                <input type="radio" v-model="settings.salesCalcMethod" value="weighted" :disabled="isFieldLocked('salesCalcMethod')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
+                                <input type="radio" v-model="tempSettings.salesCalcMethod" value="weighted" :disabled="isFieldLocked('salesCalcMethod')" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500">
                                 <span class="text-sm text-slate-700 font-medium">动态加权法 <span class="text-xs font-normal text-orange-500 block">(自定义老品与新品天数占比)</span></span>
                             </label>
                             
-                            <div v-if="settings.salesCalcMethod === 'weighted'" class="flex flex-col gap-2 mt-2 pt-3 border-t border-indigo-100">
+                            <div v-if="tempSettings.salesCalcMethod === 'weighted'" class="flex flex-col gap-2 mt-2 pt-3 border-t border-indigo-100">
                                 <div class="grid grid-cols-4 gap-2 items-center">
                                     <div class="flex flex-col items-center">
                                         <span class="text-[10px] font-bold text-slate-500 text-center">老品</span>
                                         <span v-if="isFieldLocked('weight7')" class="text-[8px] bg-red-50 text-red-600 px-0.5 rounded font-bold">🔒锁</span>
                                     </div>
-                                    <div><label class="text-[9px] text-indigo-500 font-semibold">7天(%)</label><input type="number" v-model.number="settings.weight7" :disabled="isFieldLocked('weight7')" :class="isFieldLocked('weight7') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
-                                    <div><label class="text-[9px] text-indigo-500 font-semibold">14天(%)</label><input type="number" v-model.number="settings.weight14" :disabled="isFieldLocked('weight14')" :class="isFieldLocked('weight14') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
-                                    <div><label class="text-[9px] text-indigo-500 font-semibold">30天(%)</label><input type="number" v-model.number="settings.weight30" :disabled="isFieldLocked('weight30')" :class="isFieldLocked('weight30') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">7天(%)</label><input type="number" v-model.number="tempSettings.weight7" :disabled="isFieldLocked('weight7')" :class="isFieldLocked('weight7') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">14天(%)</label><input type="number" v-model.number="tempSettings.weight14" :disabled="isFieldLocked('weight14')" :class="isFieldLocked('weight14') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-indigo-500 font-semibold">30天(%)</label><input type="number" v-model.number="tempSettings.weight30" :disabled="isFieldLocked('weight30')" :class="isFieldLocked('weight30') ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-white text-slate-800'" class="w-full border border-indigo-200 rounded p-1 text-xs text-center font-bold"></div>
                                 </div>
                                 <div class="grid grid-cols-4 gap-2 items-center pt-2 border-t border-indigo-50 border-dashed">
                                     <div class="flex flex-col items-center">
                                         <span class="text-[10px] font-bold text-green-600 text-center bg-green-100 rounded-sm leading-none py-1 mx-1 px-1">新品</span>
                                         <span v-if="isFieldLocked('weightNew7')" class="text-[8px] bg-red-50 text-red-600 px-0.5 rounded font-bold mt-0.5">🔒锁</span>
                                     </div>
-                                    <div><label class="text-[9px] text-green-600 font-semibold">7天(%)</label><input type="number" v-model.number="settings.weightNew7" :disabled="isFieldLocked('weightNew7')" :class="isFieldLocked('weightNew7') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
-                                    <div><label class="text-[9px] text-green-600 font-semibold">14天(%)</label><input type="number" v-model.number="settings.weightNew14" :disabled="isFieldLocked('weightNew14')" :class="isFieldLocked('weightNew14') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
-                                    <div><label class="text-[9px] text-green-600 font-semibold">30天(%)</label><input type="number" v-model.number="settings.weightNew30" :disabled="isFieldLocked('weightNew30')" :class="isFieldLocked('weightNew30') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">7天(%)</label><input type="number" v-model.number="tempSettings.weightNew7" :disabled="isFieldLocked('weightNew7')" :class="isFieldLocked('weightNew7') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">14天(%)</label><input type="number" v-model.number="tempSettings.weightNew14" :disabled="isFieldLocked('weightNew14')" :class="isFieldLocked('weightNew14') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
+                                    <div><label class="text-[9px] text-green-600 font-semibold">30天(%)</label><input type="number" v-model.number="tempSettings.weightNew30" :disabled="isFieldLocked('weightNew30')" :class="isFieldLocked('weightNew30') ? 'bg-slate-100 text-green-600 cursor-not-allowed' : 'bg-white text-green-700'" class="w-full border border-green-200 rounded p-1 text-xs text-center font-bold"></div>
                                 </div>
                             </div>
                         </div>
@@ -1077,27 +1077,27 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">物流与缓冲时间 (天)</h3>
                             <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                                <span class="text-xs font-bold transition-colors" :class="settings.newProductLeadTimeEnabled ? 'text-indigo-600 font-extrabold' : 'text-slate-500'">新品单独方案</span>
-                                <input type="checkbox" v-model="settings.newProductLeadTimeEnabled" :disabled="isFieldLocked('safeStock')" class="sr-only peer">
+                                <span class="text-xs font-bold transition-colors" :class="tempSettings.newProductLeadTimeEnabled ? 'text-indigo-600 font-extrabold' : 'text-slate-500'">新品单独方案</span>
+                                <input type="checkbox" v-model="tempSettings.newProductLeadTimeEnabled" :disabled="isFieldLocked('safeStock')" class="sr-only peer">
                                 <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600 transition-colors relative"></div>
                             </label>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
-                            <div><label class="text-xs text-slate-600">迪拜空运</label><input type="number" v-model.number="settings.uaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
-                            <div><label class="text-xs text-slate-600">沙特空运</label><input type="number" v-model.number="settings.ksaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
-                            <div><label class="text-xs text-slate-600">迪拜海运</label><input type="number" v-model.number="settings.uaeSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
-                            <div><label class="text-xs text-slate-600">沙特海运</label><input type="number" v-model.number="settings.ksaSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">迪拜空运</label><input type="number" v-model.number="tempSettings.uaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">沙特空运</label><input type="number" v-model.number="tempSettings.ksaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">迪拜海运</label><input type="number" v-model.number="tempSettings.uaeSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
+                            <div><label class="text-xs text-slate-600">沙特海运</label><input type="number" v-model.number="tempSettings.ksaSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white'" class="w-full mt-1 border border-slate-200 rounded p-1.5 text-sm text-center"></div>
                             <div class="col-span-2">
                                 <div class="flex justify-between items-center">
                                     <label class="text-xs text-slate-600 font-bold text-indigo-600">安全库存缓冲 (天)</label>
                                     <span v-if="isFieldLocked('safeStock')" class="text-[9px] bg-red-100 text-red-600 px-1 rounded font-bold">🔒已被管理员锁定</span>
                                 </div>
-                                <input type="number" v-model.number="settings.safeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-indigo-50 text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold">
+                                <input type="number" v-model.number="tempSettings.safeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-indigo-50 text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold">
                             </div>
                         </div>
 
                         <!-- 开启新品单独方案后展示的新品专属输入位置 -->
-                        <div v-if="settings.newProductLeadTimeEnabled" class="mt-3 p-3 bg-indigo-50/80 rounded-xl border border-indigo-200/80 transition-all">
+                        <div v-if="tempSettings.newProductLeadTimeEnabled" class="mt-3 p-3 bg-indigo-50/80 rounded-xl border border-indigo-200/80 transition-all">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
                                     <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
@@ -1108,25 +1108,25 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                             <div class="grid grid-cols-2 gap-2.5">
                                 <div>
                                     <label class="text-[11px] text-slate-600 font-medium">新品迪拜空运</label>
-                                    <input type="number" v-model.number="settings.newProductUaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                    <input type="number" v-model.number="tempSettings.newProductUaeAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
                                 </div>
                                 <div>
                                     <label class="text-[11px] text-slate-600 font-medium">新品沙特空运</label>
-                                    <input type="number" v-model.number="settings.newProductKsaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                    <input type="number" v-model.number="tempSettings.newProductKsaAirLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
                                 </div>
                                 <div>
                                     <label class="text-[11px] text-slate-600 font-medium">新品迪拜海运</label>
-                                    <input type="number" v-model.number="settings.newProductUaeSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                    <input type="number" v-model.number="tempSettings.newProductUaeSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
                                 </div>
                                 <div>
                                     <label class="text-[11px] text-slate-600 font-medium">新品沙特海运</label>
-                                    <input type="number" v-model.number="settings.newProductKsaSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
+                                    <input type="number" v-model.number="tempSettings.newProductKsaSeaLeadTime" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-700'" class="w-full mt-1 border border-indigo-200 rounded p-1.5 text-sm text-center font-semibold">
                                 </div>
                                 <div class="col-span-2">
                                     <div class="flex justify-between items-center">
                                         <label class="text-[11px] text-indigo-800 font-bold">新品安全库存缓冲 (天)</label>
                                     </div>
-                                    <input type="number" v-model.number="settings.newProductSafeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-900'" class="w-full mt-1 border border-indigo-300 rounded p-1.5 text-sm text-center font-bold">
+                                    <input type="number" v-model.number="tempSettings.newProductSafeStock" :disabled="isFieldLocked('safeStock')" :class="isFieldLocked('safeStock') ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white text-indigo-900'" class="w-full mt-1 border border-indigo-300 rounded p-1.5 text-sm text-center font-bold">
                                 </div>
                             </div>
                         </div>
@@ -1146,11 +1146,11 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
 
                         <!-- 当前已添加的过季类目标签池 -->
                         <div class="flex flex-wrap gap-1.5 mb-2.5 min-h-[34px] p-2 bg-white rounded-lg border border-rose-200/80 items-center">
-                            <span v-for="cat in (settings.offSeasonCategories || [])" :key="cat" class="inline-flex items-center gap-1 bg-gradient-to-r from-rose-500 to-red-500 text-white px-2 py-0.5 rounded-md text-xs font-bold shadow-xs">
+                            <span v-for="cat in (tempSettings.offSeasonCategories || [])" :key="cat" class="inline-flex items-center gap-1 bg-gradient-to-r from-rose-500 to-red-500 text-white px-2 py-0.5 rounded-md text-xs font-bold shadow-xs">
                                 <span>🍂 {{ cat }}</span>
                                 <button @click="removeOffSeasonCategory(cat)" class="text-white/80 hover:text-white hover:bg-black/20 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center text-[10px] ml-0.5 transition cursor-pointer" title="移除此过季类目">×</button>
                             </span>
-                            <span v-if="!settings.offSeasonCategories || settings.offSeasonCategories.length === 0" class="text-xs text-slate-400 py-0.5">
+                            <span v-if="!tempSettings.offSeasonCategories || tempSettings.offSeasonCategories.length === 0" class="text-xs text-slate-400 py-0.5">
                                 暂无已添加的过季类目 (请在下方选择添加)
                             </span>
                         </div>
@@ -1181,25 +1181,25 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                 <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
                                     <span>✈️</span> 迪拜空运 (元/kg)
                                 </label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeAirFreightRate')" :class="isFieldLocked('uaeAirFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.uaeAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeAirFreightRate')" :class="isFieldLocked('uaeAirFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.uaeAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
                                     <span>✈️</span> 沙特空运 (元/kg)
                                 </label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaAirFreightRate')" :class="isFieldLocked('ksaAirFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.ksaAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaAirFreightRate')" :class="isFieldLocked('ksaAirFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.ksaAirFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
                                     <span>🚢</span> 迪拜海运 (元/kg)
                                 </label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeSeaFreightRate')" :class="isFieldLocked('uaeSeaFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.uaeSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeSeaFreightRate')" :class="isFieldLocked('uaeSeaFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.uaeSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-600 font-medium flex items-center gap-1">
                                     <span>🚢</span> 沙特海运 (元/kg)
                                 </label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaSeaFreightRate')" :class="isFieldLocked('ksaSeaFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.ksaSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaSeaFreightRate')" :class="isFieldLocked('ksaSeaFreightRate') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.ksaSeaFreightRate" class="w-full mt-1 bg-white border border-amber-200 rounded p-1.5 text-sm text-center font-bold text-amber-700">
                             </div>
                         </div>
                     </div>
@@ -1208,11 +1208,11 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
 <div class="p-4 bg-indigo-50/70 rounded-xl border border-indigo-100">
     <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-3 flex justify-between items-center">
         <span>✈️🚢 空海结合配比比例</span>
-        <span class="text-sm font-black text-indigo-600">空 {{ settings.airSeaRatio }}% : 海 {{ 100 - settings.airSeaRatio }}%</span>
+        <span class="text-sm font-black text-indigo-600">空 {{ tempSettings.airSeaRatio }}% : 海 {{ 100 - tempSettings.airSeaRatio }}%</span>
     </h3>
     <div class="flex items-center gap-3">
         <span class="text-xs font-medium text-slate-500">✈️ 空运</span>
-        <input type="range" :disabled="isFieldLocked('airSeaRatio')" :class="isFieldLocked('airSeaRatio') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.airSeaRatio" min="0" max="100" class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+        <input type="range" :disabled="isFieldLocked('airSeaRatio')" :class="isFieldLocked('airSeaRatio') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.airSeaRatio" min="0" max="100" class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
         <span class="text-xs font-medium text-slate-500">🚢 海运</span>
     </div>
     <p class="text-[10px] text-slate-400 mt-2 leading-tight">注：选定空海结合的SKU在下载计划表时，将按此比例分割为“空运”与“海运”独立两行。解耦计算自动取整。</p>
@@ -1221,9 +1221,9 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
 <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">补货基数配置 (天)</h3>
     <div class="grid grid-cols-3 gap-2">
-        <div><label class="text-xs text-slate-600">爆款</label><input type="number" :disabled="isFieldLocked('baoRestockDays')" :class="isFieldLocked('baoRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.baoRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
-        <div><label class="text-xs text-slate-600">旺款</label><input type="number" :disabled="isFieldLocked('wangRestockDays')" :class="isFieldLocked('wangRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.wangRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
-        <div><label class="text-xs text-slate-600">平款</label><input type="number" :disabled="isFieldLocked('normalRestockDays')" :class="isFieldLocked('normalRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.normalRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+        <div><label class="text-xs text-slate-600">爆款</label><input type="number" :disabled="isFieldLocked('baoRestockDays')" :class="isFieldLocked('baoRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.baoRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+        <div><label class="text-xs text-slate-600">旺款</label><input type="number" :disabled="isFieldLocked('wangRestockDays')" :class="isFieldLocked('wangRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.wangRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
+        <div><label class="text-xs text-slate-600">平款</label><input type="number" :disabled="isFieldLocked('normalRestockDays')" :class="isFieldLocked('normalRestockDays') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.normalRestockDays" class="w-full mt-1 bg-white border border-slate-200 rounded p-1 text-sm text-center"></div>
     </div>
 </div>
 
@@ -1232,46 +1232,46 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
     <div class="space-y-3">
         <div class="flex justify-between items-center">
             <label class="text-xs text-slate-600">爆款最低销量 (个)</label>
-            <input type="number" :disabled="isFieldLocked('baoThreshold')" :class="isFieldLocked('baoThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.baoThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-red-500">
+            <input type="number" :disabled="isFieldLocked('baoThreshold')" :class="isFieldLocked('baoThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.baoThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-red-500">
         </div>
         <div class="flex justify-between items-center">
             <label class="text-xs text-slate-600">旺款最低销量 (个)</label>
-            <input type="number" :disabled="isFieldLocked('wangThreshold')" :class="isFieldLocked('wangThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.wangThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-orange-500">
+            <input type="number" :disabled="isFieldLocked('wangThreshold')" :class="isFieldLocked('wangThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.wangThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center font-bold text-orange-500">
         </div>
 
                             <div class="flex justify-between items-center">
                                 <label class="text-xs text-slate-600">迪拜空/海分界重量 (kg)</label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeWeightThreshold')" :class="isFieldLocked('uaeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.uaeWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeWeightThreshold')" :class="isFieldLocked('uaeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.uaeWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
                             </div>
                             <div class="flex justify-between items-center">
                                 <label class="text-xs text-slate-600">沙特空/海分界重量 (kg)</label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaWeightThreshold')" :class="isFieldLocked('ksaWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.ksaWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaWeightThreshold')" :class="isFieldLocked('ksaWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.ksaWeightThreshold" class="w-20 bg-white border border-slate-200 rounded p-1.5 text-sm text-center">
                             </div>
                             <div class="flex justify-between items-center">
                                 <label class="text-xs text-slate-600 font-medium text-indigo-900">迪拜体积重警戒线 (kg)</label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeVolumeWeightThreshold')" :class="isFieldLocked('uaeVolumeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.uaeVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('uaeVolumeWeightThreshold')" :class="isFieldLocked('uaeVolumeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.uaeVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
                             </div>
                             <div class="flex justify-between items-center">
                                 <label class="text-xs text-slate-600 font-medium text-indigo-900">沙特体积重警戒线 (kg)</label>
-                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaVolumeWeightThreshold')" :class="isFieldLocked('ksaVolumeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.ksaVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
+                                <input type="number" step="0.01" :disabled="isFieldLocked('ksaVolumeWeightThreshold')" :class="isFieldLocked('ksaVolumeWeightThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.ksaVolumeWeightThreshold" class="w-20 bg-indigo-50/50 border border-indigo-200 rounded p-1.5 text-sm text-center font-bold text-indigo-700" placeholder="0.8">
                             </div>
                             <div class="flex justify-between items-center border-t border-slate-200 pt-3">
                                 <div>
                                     <label class="text-xs font-bold text-red-600 block">FBA 亏本预警线 (元)</label>
                                     <span class="text-[10px] text-slate-400">售价 - FBA成本 &lt; 此值时提示</span>
                                 </div>
-                                <input type="number" step="0.5" :disabled="isFieldLocked('fbaLossThreshold')" :class="isFieldLocked('fbaLossThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.fbaLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="10">
+                                <input type="number" step="0.5" :disabled="isFieldLocked('fbaLossThreshold')" :class="isFieldLocked('fbaLossThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.fbaLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="10">
                             </div>
                             <div class="flex justify-between items-center">
                                 <div>
                                     <label class="text-xs font-bold text-red-600 block">SF 亏本预警线 (元)</label>
                                     <span class="text-[10px] text-slate-400">售价 - SF成本 &lt; 此值时提示</span>
                                 </div>
-                                <input type="number" step="0.5" :disabled="isFieldLocked('sfLossThreshold')" :class="isFieldLocked('sfLossThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.sfLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="12">
+                                <input type="number" step="0.5" :disabled="isFieldLocked('sfLossThreshold')" :class="isFieldLocked('sfLossThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.sfLossThreshold" class="w-20 bg-red-50/60 border border-red-200 rounded p-1.5 text-sm text-center font-bold text-red-600" placeholder="12">
                             </div>
                             <div class="flex justify-between items-center border-t border-slate-200 pt-3">
                                 <label class="text-xs font-bold text-orange-600">预警：单日销量占比阈值 (%)</label>
-                                <input type="number" :disabled="isFieldLocked('volatilityThreshold')" :class="isFieldLocked('volatilityThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="settings.volatilityThreshold" class="w-20 bg-orange-50 border border-orange-200 text-orange-700 rounded p-1.5 text-sm text-center">
+                                <input type="number" :disabled="isFieldLocked('volatilityThreshold')" :class="isFieldLocked('volatilityThreshold') ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-800'" v-model.number="tempSettings.volatilityThreshold" class="w-20 bg-orange-50 border border-orange-200 text-orange-700 rounded p-1.5 text-sm text-center">
                             </div>
                         </div>
                     </div>
@@ -1279,7 +1279,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between mt-2">
                         <h3 class="text-xs font-bold text-slate-700">显示「沙特(跨国)」区域数据</h3>
                         <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" :disabled="isFieldLocked('showKsaCrossBorder')" v-model="settings.showKsaCrossBorder" class="sr-only peer">
+                            <input type="checkbox" :disabled="isFieldLocked('showKsaCrossBorder')" v-model="tempSettings.showKsaCrossBorder" class="sr-only peer">
                             <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
                     </div>
@@ -1344,7 +1344,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
             </div>
         </transition>
         
-        <div v-if="showSettings || showSOP" @click="showSettings = false; showSOP = false" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity"></div>
+        <div v-if="showSettings || showSOP" @click="handleOverlayClick" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 transition-opacity"></div>
     </div>
 
     <script>
@@ -1856,6 +1856,59 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     ksaSeaFreightRate: 20.0
                 });
 
+                // 设置抽屉临时参数对象与脏检查机制
+                const tempSettings = ref(JSON.parse(JSON.stringify(settings.value)));
+                const originalSettingsSnapshot = ref(JSON.stringify(tempSettings.value));
+
+                // 判断设置是否有未保存修改 (Dirty Check)
+                const hasUnsavedSettingsChanges = () => {
+                    if (!originalSettingsSnapshot.value) return false;
+                    try {
+                        const orig = JSON.parse(originalSettingsSnapshot.value);
+                        const curr = JSON.parse(JSON.stringify(tempSettings.value));
+                        const allKeys = Array.from(new Set([...Object.keys(orig), ...Object.keys(curr)]));
+                        for (const k of allKeys) {
+                            const v1 = orig[k];
+                            const v2 = curr[k];
+                            if (Array.isArray(v1) || Array.isArray(v2)) {
+                                const arr1 = Array.isArray(v1) ? [...v1].sort() : [];
+                                const arr2 = Array.isArray(v2) ? [...v2].sort() : [];
+                                if (JSON.stringify(arr1) !== JSON.stringify(arr2)) return true;
+                            } else {
+                                if (v1 !== v2) {
+                                    if (Number(v1) !== Number(v2) || String(v1) !== String(v2)) return true;
+                                }
+                            }
+                        }
+                        return false;
+                    } catch (e) {
+                        return JSON.stringify(tempSettings.value) !== originalSettingsSnapshot.value;
+                    }
+                };
+
+                // 关闭设置面板前的未保存拦截
+                const handleCloseSettings = () => {
+                    if (hasUnsavedSettingsChanges()) {
+                        const confirmDiscard = window.confirm('⚠️ 检测到您对系统参数做出了修改，尚未点击【保存参数并生效】！\n\n• 点击【确定】：放弃本次修改并直接关闭\n• 点击【取消】：返回设置面板继续编辑');
+                        if (!confirmDiscard) {
+                            return; // 留在设置面板
+                        }
+                    }
+                    // 确认放弃或未作修改：复原 tempSettings 并关闭弹窗
+                    tempSettings.value = JSON.parse(JSON.stringify(settings.value));
+                    showSettings.value = false;
+                };
+
+                // 遮罩层点击拦截
+                const handleOverlayClick = () => {
+                    if (showSOP.value) {
+                        showSOP.value = false;
+                    }
+                    if (showSettings.value) {
+                        handleCloseSettings();
+                    }
+                };
+
                 const skuBaseMap = ref({}); 
                 const processedData = ref([]); 
                 const hasSkuData = computed(() => Object.keys(skuBaseMap.value).length > 0);
@@ -2010,12 +2063,16 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                     }
                 };
 
-                // 需求3：每次点击打开设置页面都会联网同步后台修改
+                // 需求3：每次点击打开设置页面都会联网同步后台修改，并克隆一份临时设置对象
                 const openSettingsDrawer = async () => {
-                    showSettings.value = true;
                     if (isUserLoggedIn.value && userToken.value) {
                         await fetchLatestSettingsFromCloud(true);
                     }
+                    // 从当前实际生效的 settings 深拷贝初始化 tempSettings
+                    tempSettings.value = JSON.parse(JSON.stringify(settings.value));
+                    originalSettingsSnapshot.value = JSON.stringify(tempSettings.value);
+                    selectedCategoryToAdd.value = '';
+                    showSettings.value = true;
                 };
 
                 // 需求1：登录成功并持久化 localStorage (刷新不退出)
@@ -2077,16 +2134,16 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                     userLoginForm.value.password = '';
                 };
 
-                // 需求2：显式点击“保存参数并生效”按钮上传至云端并立即重新计算
+                // 需求2：显式点击“保存参数并生效”按钮上传至云端并立即重新计算（仅在此处生效并上传）
                 const saveAndApplySettings = async () => {
                     if (isSavingSettings.value) return;
 
-                    // 1. 检查防篡改回滚
+                    // 1. 检查防篡改回滚（校验 tempSettings）
                     if (lockedFields.value && lockedFields.value.length > 0 && lastSyncedSettings.value) {
                         let rollbackCount = 0;
                         lockedFields.value.forEach(lockedKey => {
-                            if (lastSyncedSettings.value[lockedKey] !== undefined && String(settings.value[lockedKey]) !== String(lastSyncedSettings.value[lockedKey])) {
-                                settings.value[lockedKey] = lastSyncedSettings.value[lockedKey];
+                            if (lastSyncedSettings.value[lockedKey] !== undefined && String(tempSettings.value[lockedKey]) !== String(lastSyncedSettings.value[lockedKey])) {
+                                tempSettings.value[lockedKey] = lastSyncedSettings.value[lockedKey];
                                 rollbackCount++;
                             }
                         });
@@ -2098,10 +2155,13 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
 
                     isSavingSettings.value = true;
                     try {
-                        // 2. 本地缓存立即更新
+                        // 2. 将临时编辑的参数正式同步覆盖至 settings.value
+                        settings.value = JSON.parse(JSON.stringify(tempSettings.value));
+
+                        // 3. 本地缓存立即更新
                         await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(settings.value)));
 
-                        // 3. 立即向云端上传并同步
+                        // 4. 立即向云端上传并同步最新配置
                         if (isUserLoggedIn.value && userToken.value) {
                             syncStatus.value = 'syncing';
                             const { res, data } = await apiRequestWithRetry('/user/sync-settings', {
@@ -2117,7 +2177,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                                 const now = new Date();
                                 lastSyncTime.value = now.toLocaleTimeString();
                                 lastSyncedSettings.value = JSON.parse(JSON.stringify(settings.value));
-                                showToast('保存成功已生效', '新参数已实时同步至云端后台监控中心', 'success');
+                                showToast('保存成功已生效', '新参数已正式生效并同步至云端后台监控中心', 'success');
                             } else {
                                 syncStatus.value = 'error';
                                 showToast('云端保存异常', data.message || '后台拒绝保存', 'error');
@@ -2126,12 +2186,21 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                             showToast('本地保存成功', '当前未登录云端账号', 'warn');
                         }
 
-                        // 4. 关闭设置面板
+                        // 5. 更新已保存快照并关闭设置面板
+                        originalSettingsSnapshot.value = JSON.stringify(settings.value);
                         showSettings.value = false;
 
-                        // 5. 立即重新计算补货计划
-                        if (typeof triggerRecalculate === 'function') {
-                            triggerRecalculate();
+                        // 6. 立即触发全局补货数据重新计算与分级刷新
+                        if (processedData.value && processedData.value.length > 0) {
+                            processedData.value.forEach(item => {
+                                if (item.calculatedMonthlySales >= settings.value.baoThreshold) {
+                                    item.itemType = '爆款';
+                                } else if (item.calculatedMonthlySales >= settings.value.wangThreshold) {
+                                    item.itemType = '旺款';
+                                } else {
+                                    item.itemType = '平款';
+                                }
+                            });
                         }
                     } catch (e) {
                         syncStatus.value = 'error';
@@ -2323,60 +2392,7 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                 watch(processedData, saveProcessedData);
 
                 
-                // 3. 系统参数设置保存（双重存储：本地 IndexedDB + 静默实时同步至 VPS 云端）
-                let settingsTimer = null;
-let settingsSaveTimer = null;
-                watch(settings, (val) => {
-                    if (settingsTimer) clearTimeout(settingsTimer);
-                    settingsTimer = setTimeout(async () => {
-                        // 1. 检查是否有人尝试修改被锁定的参数，如有则强制回滚并告警 (需求2)
-                        if (lockedFields.value && lockedFields.value.length > 0 && lastSyncedSettings.value) {
-                            let rollbackCount = 0;
-                            lockedFields.value.forEach(lockedKey => {
-                                if (lastSyncedSettings.value[lockedKey] !== undefined && String(val[lockedKey]) !== String(lastSyncedSettings.value[lockedKey])) {
-                                    val[lockedKey] = lastSyncedSettings.value[lockedKey];
-                                    rollbackCount++;
-                                }
-                            });
-                            if (rollbackCount > 0) {
-                                showToast('管理员已锁定该参数', '受控参数不可在本地修改，已自动复原', 'warn');
-                                return;
-                            }
-                        }
-
-                        // 保存本地缓存
-                        await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(val)));
-
-                        // 2. 若已登录，实时同步至云端并提供明确反馈 (需求3)
-                        if (isUserLoggedIn.value && userToken.value) {
-                            syncStatus.value = 'syncing';
-                            try {
-                                const { res, data } = await apiRequestWithRetry('/user/sync-settings', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': 'Bearer ' + userToken.value
-                                    },
-                                    body: JSON.stringify({ settings: val })
-                                });
-                                if (data.success) {
-                                    syncStatus.value = 'synced';
-                                    const now = new Date();
-                                    lastSyncTime.value = now.toLocaleTimeString();
-                                    lastSyncedSettings.value = JSON.parse(JSON.stringify(val));
-                                    showToast('参数配置已生效', '已实时同步至云端监控中心', 'success');
-                                } else {
-                                    syncStatus.value = 'error';
-                                    showToast('同步失败', data.message || '云端拒绝更新', 'error');
-                                }
-                            } catch (err) {
-                                syncStatus.value = 'error';
-                                showToast('网络连接异常', '未能同步至云端，稍后将自动重试', 'error');
-                            }
-                        }
-                    }, 400);
-                }, { deep: true });
-                // ---------------------------------
+                // 参数保存与生效规则：严格只在运营点击【保存参数并生效】按钮后执行本地存储与云端上传
 
 
                 watch([filterCountry, filterLogistics, filterItemType, filterStatus, filterNewProduct,
@@ -2461,28 +2477,24 @@ let settingsSaveTimer = null;
                 // --- 过季类目管理响应式状态与函数 ---
                 const selectedCategoryToAdd = ref('');
                 const availableCategoriesToAdd = computed(() => {
-                    const currentOff = settings.value.offSeasonCategories || [];
+                    const currentOff = (tempSettings.value && tempSettings.value.offSeasonCategories) || [];
                     return ALLOWED_CATEGORIES.filter(c => !currentOff.includes(c));
                 });
 
-                const addOffSeasonCategory = async () => {
+                const addOffSeasonCategory = () => {
                     if (!selectedCategoryToAdd.value) return;
-                    if (!settings.value.offSeasonCategories) {
-                        settings.value.offSeasonCategories = [];
+                    if (!tempSettings.value.offSeasonCategories) {
+                        tempSettings.value.offSeasonCategories = [];
                     }
-                    if (!settings.value.offSeasonCategories.includes(selectedCategoryToAdd.value)) {
-                        settings.value.offSeasonCategories.push(selectedCategoryToAdd.value);
-                        await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(settings.value)));
-                        showToast('过季类目已添加', `【${selectedCategoryToAdd.value}】已加入过季监控名单并自动置顶`, 'success');
+                    if (!tempSettings.value.offSeasonCategories.includes(selectedCategoryToAdd.value)) {
+                        tempSettings.value.offSeasonCategories.push(selectedCategoryToAdd.value);
                     }
                     selectedCategoryToAdd.value = '';
                 };
 
-                const removeOffSeasonCategory = async (cat) => {
-                    if (!settings.value.offSeasonCategories) return;
-                    settings.value.offSeasonCategories = settings.value.offSeasonCategories.filter(c => c !== cat);
-                    await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(settings.value)));
-                    showToast('已移除过季类目', `【${cat}】已恢复为常规类目`, 'info');
+                const removeOffSeasonCategory = (cat) => {
+                    if (!tempSettings.value.offSeasonCategories) return;
+                    tempSettings.value.offSeasonCategories = tempSettings.value.offSeasonCategories.filter(c => c !== cat);
                 };
 
                 const handleSalesFileUpload = (e) => {
@@ -3864,7 +3876,7 @@ const exportExcel = () => {
 
                 return {
                     CURRENT_VERSION,
-                    openSettingsDrawer, saveAndApplySettings, isSavingSettings, isUserLoggedIn, currentUser, userToken, lockedFields, isFieldLocked, syncStatus, lastSyncTime, toastVisible, toastTitle, toastMsg, toastType, showToast,
+                    tempSettings, handleCloseSettings, handleOverlayClick, hasUnsavedSettingsChanges, openSettingsDrawer, saveAndApplySettings, isSavingSettings, isUserLoggedIn, currentUser, userToken, lockedFields, isFieldLocked, syncStatus, lastSyncTime, toastVisible, toastTitle, toastMsg, toastType, showToast,
                     userLoginForm, userLoginLoading, userLoginError, handleUserLogin, handleUserLogout,
                     showChangePwdModal, changePwdForm, changePwdError, changePwdSuccess, changePwdLoading, handleChangePassword,
                     filterLoss,
