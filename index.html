@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能补货辅助系统 v4.6.5</title>
+    <title>智能补货辅助系统 v4.6.6</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Vue 3 核心库 (内联离线版本，100% 秒开杜绝白屏) -->
@@ -787,6 +787,14 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                         </span>
                                     </div>
                                     <span v-else class="text-slate-300">-</span>
+
+                                    <!-- 命中过季类目提醒: 偏红色呼吸灯行 (同改空运效果，文案为留意过季) -->
+                                    <div v-if="item.isOffSeason" class="mt-1 flex justify-center">
+                                        <span class="text-[10px] bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white font-bold px-2 py-0.5 rounded shadow-sm inline-flex items-center gap-1 transition-all animate-pulse select-none whitespace-nowrap cursor-help"
+                                              :title="'⚠️ 该商品属于过季类目 [' + item.skuCategory + ']，已优先置顶提醒！建议严格复核补货数量，谨防过季积压！'">
+                                            <span>🍂 留意过季</span>
+                                        </span>
+                                    </div>
                                 </td>
 
                                 <td class="p-1.5 text-sm font-semibold text-center align-middle border-b border-slate-100">
@@ -1124,6 +1132,43 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                         </div>
                     </div>
 
+                    <!-- 新增：过季类目管理 -->
+                    <div class="p-4 bg-rose-50/70 rounded-xl border border-rose-100 transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-xs font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🍂 过季类目管理</span>
+                            </h3>
+                            <span class="text-[10px] text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded font-bold">命中自动优先置顶 + 呼吸灯</span>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mb-2 leading-relaxed">
+                            选择当前已过季/淡季的类目，前台将自动<strong>将命中产品优先置顶展示</strong>，并亮起偏红色<strong>「留意过季」</strong>呼吸灯。
+                        </p>
+
+                        <!-- 当前已添加的过季类目标签池 -->
+                        <div class="flex flex-wrap gap-1.5 mb-2.5 min-h-[34px] p-2 bg-white rounded-lg border border-rose-200/80 items-center">
+                            <span v-for="cat in (settings.offSeasonCategories || [])" :key="cat" class="inline-flex items-center gap-1 bg-gradient-to-r from-rose-500 to-red-500 text-white px-2 py-0.5 rounded-md text-xs font-bold shadow-xs">
+                                <span>🍂 {{ cat }}</span>
+                                <button @click="removeOffSeasonCategory(cat)" class="text-white/80 hover:text-white hover:bg-black/20 rounded-full w-3.5 h-3.5 inline-flex items-center justify-center text-[10px] ml-0.5 transition cursor-pointer" title="移除此过季类目">×</button>
+                            </span>
+                            <span v-if="!settings.offSeasonCategories || settings.offSeasonCategories.length === 0" class="text-xs text-slate-400 py-0.5">
+                                暂无已添加的过季类目 (请在下方选择添加)
+                            </span>
+                        </div>
+
+                        <!-- 下拉添加控制器 -->
+                        <div class="flex items-center gap-2">
+                            <select v-model="selectedCategoryToAdd" class="text-xs bg-white border border-rose-200 rounded-lg p-1.5 flex-1 outline-none focus:ring-2 focus:ring-rose-400 cursor-pointer text-slate-700">
+                                <option value="">-- 选择监控列表中的类目添加 --</option>
+                                <option v-for="cat in availableCategoriesToAdd" :key="cat" :value="cat">
+                                    🍂 {{ cat }}
+                                </option>
+                            </select>
+                            <button @click="addOffSeasonCategory" :disabled="!selectedCategoryToAdd" :class="selectedCategoryToAdd ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all shrink-0">
+                                ➕ 添加过季
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="p-4 bg-amber-50/60 rounded-xl border border-amber-100">
                         <h3 class="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2 flex justify-between items-center">
                             <span>💰 中东干线运费单价配置 (元/kg)</span>
@@ -1306,7 +1351,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
         const { createApp, ref, computed, watch, onMounted } = Vue;
 
         
-        const CURRENT_VERSION = '4.6.5';
+        const CURRENT_VERSION = '4.6.6';
         const DEFAULT_GITHUB_REPO = 'disky1998/replenish-system';
 
         const compareVersions = (v1, v2) => {
@@ -1323,7 +1368,11 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
             return 0;
         };
 
-        const ALLOWED_CATEGORIES = ['开学季', '情人节', '跟卖', '复活节', '夏', '母亲节', '儿童节', '父亲节', '毕业季', '排灯节', '万圣节', '感恩节', '圣诞UAE', '冬'];
+        const ALLOWED_CATEGORIES = [
+            '开学季', '情人节', '跟卖', '复活节', '夏', '母亲节', '儿童节', '父亲节',
+            '毕业季', '排灯节', '万圣节', '万圣节（万圣节11.1就是万圣节）', '感恩节', '圣诞UAE', '冬',
+            '旅游季', '宰牲节', '春节UAE', '斋月'
+        ];
 
         const getSparklinePointsRaw = (data) => {
             if (!data || data.length === 0) return [];
@@ -1779,6 +1828,8 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     safeStock: 10,
                     // 2.1 新品单独方案参数
                     newProductLeadTimeEnabled: false,
+                    // 2.2 过季类目管理
+                    offSeasonCategories: [],
                     newProductSafeStock: 10,
                     newProductUaeAirLeadTime: 15,
                     newProductKsaAirLeadTime: 15,
@@ -2407,6 +2458,33 @@ let settingsSaveTimer = null;
                     isDragOver.value = false;
                     if (e.dataTransfer?.files[0]) processFile(e.dataTransfer.files[0], true);
                 };
+                // --- 过季类目管理响应式状态与函数 ---
+                const selectedCategoryToAdd = ref('');
+                const availableCategoriesToAdd = computed(() => {
+                    const currentOff = settings.value.offSeasonCategories || [];
+                    return ALLOWED_CATEGORIES.filter(c => !currentOff.includes(c));
+                });
+
+                const addOffSeasonCategory = async () => {
+                    if (!selectedCategoryToAdd.value) return;
+                    if (!settings.value.offSeasonCategories) {
+                        settings.value.offSeasonCategories = [];
+                    }
+                    if (!settings.value.offSeasonCategories.includes(selectedCategoryToAdd.value)) {
+                        settings.value.offSeasonCategories.push(selectedCategoryToAdd.value);
+                        await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(settings.value)));
+                        showToast('过季类目已添加', `【${selectedCategoryToAdd.value}】已加入过季监控名单并自动置顶`, 'success');
+                    }
+                    selectedCategoryToAdd.value = '';
+                };
+
+                const removeOffSeasonCategory = async (cat) => {
+                    if (!settings.value.offSeasonCategories) return;
+                    settings.value.offSeasonCategories = settings.value.offSeasonCategories.filter(c => c !== cat);
+                    await localforage.setItem('replenish_settings', JSON.parse(JSON.stringify(settings.value)));
+                    showToast('已移除过季类目', `【${cat}】已恢复为常规类目`, 'info');
+                };
+
                 const handleSalesFileUpload = (e) => {
                     if (e.target.files[0]) processFile(e.target.files[0], false);
                     e.target.value = '';
@@ -2632,6 +2710,15 @@ const processInTransitData = (data) => {
 
                 // --- 高性能原型定义 (所有Getter计算属性共享，零重复闭包，空setter防御性吸收赋值，阻断 deep watch 无效遍历) ---
                 const ItemPrototype = {
+                    get isOffSeason() {
+                        if (!this.skuCategory || !settings.value.offSeasonCategories || !Array.isArray(settings.value.offSeasonCategories) || settings.value.offSeasonCategories.length === 0) {
+                            return false;
+                        }
+                        const curCats = String(this.skuCategory).split(/[,，;；\s]+/).filter(Boolean);
+                        return curCats.some(c => settings.value.offSeasonCategories.includes(c));
+                    },
+                    set isOffSeason(v) {},
+
                     get isNewProduct() {
                         const candidates = [];
                         [this.msku, this.sku].forEach(val => {
@@ -3477,6 +3564,18 @@ const processInTransitData = (data) => {
                         }
                     }
 
+                    // 优先置顶处理：命中过季类目的产品优先排在最上方
+                    if (settings.value.offSeasonCategories && settings.value.offSeasonCategories.length > 0) {
+                        result = [...result].sort((a, b) => {
+                            const offA = a.isOffSeason ? 1 : 0;
+                            const offB = b.isOffSeason ? 1 : 0;
+                            if (offA !== offB) {
+                                return offB - offA; // 命中过季类目的排在前面（优先置顶）
+                            }
+                            return 0; // 维持原排序
+                        });
+                    }
+
                     return result;
                 });
 
@@ -3764,6 +3863,10 @@ const exportExcel = () => {
                     isDownloadingUpdate,
                     checkVersionUpdate,
                     downloadLatestHtml,
+                    selectedCategoryToAdd,
+                    availableCategoriesToAdd,
+                    addOffSeasonCategory,
+                    removeOffSeasonCategory,
                     settings, showSettings, showSOP, hideSafe, needRestockCount,
                     isDragOver, hasSkuData,
                     isConfigCollapsed,
