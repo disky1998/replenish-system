@@ -1370,7 +1370,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
 
         const ALLOWED_CATEGORIES = [
             '开学季', '情人节', '跟卖', '复活节', '夏', '母亲节', '儿童节', '父亲节',
-            '毕业季', '排灯节', '万圣节', '万圣节（万圣节11.1就是万圣节）', '感恩节', '圣诞UAE', '冬',
+            '毕业季', '排灯节', '万圣节', '万圣节11.1', '感恩节', '圣诞UAE', '冬',
             '旅游季', '宰牲节', '春节UAE', '斋月'
         ];
 
@@ -2646,7 +2646,16 @@ const processInTransitData = (data) => {
                         let finalCat = '';
                         if (catKey && row[catKey]) {
                             const tags = String(row[catKey]).split(/[,;，；]/).map(t => t.trim());
-                            const validTags = tags.filter(t => ALLOWED_CATEGORIES.includes(t));
+                            const validTags = [];
+                            tags.forEach(t => {
+                                if (!t) return;
+                                if (ALLOWED_CATEGORIES.includes(t)) {
+                                    if (!validTags.includes(t)) validTags.push(t);
+                                } else if (t.includes('万圣节')) {
+                                    const tagToAdd = t.includes('11.1') ? '万圣节11.1' : '万圣节';
+                                    if (!validTags.includes(tagToAdd)) validTags.push(tagToAdd);
+                                }
+                            });
                             finalCat = validTags.join(', ');
                         }
                         
@@ -2715,7 +2724,10 @@ const processInTransitData = (data) => {
                             return false;
                         }
                         const curCats = String(this.skuCategory).split(/[,，;；\s]+/).filter(Boolean);
-                        return curCats.some(c => settings.value.offSeasonCategories.includes(c));
+                        const offCats = settings.value.offSeasonCategories;
+                        return curCats.some(c => {
+                            return offCats.some(off => c === off || (c.includes('万圣节') && off.includes('万圣节')));
+                        });
                     },
                     set isOffSeason(v) {},
 
