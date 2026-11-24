@@ -181,9 +181,9 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
 
         <!-- 悬浮改空运成本测算卡片 (亮色舒适风格，最高层级固定浮动，智能避让表头，不伤眼更清晰) -->
         <div class="fixed z-[99999] pointer-events-none transition-all duration-150 ease-out transform origin-center"
-             :class="airTooltipVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'"
+             :class="(airTooltipVisible && airTooltipItem && airTooltipItem.urgentAirRisk) ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'"
              :style="{ left: airTooltipPos.left, top: airTooltipPos.top, width: '310px' }">
-            <div v-if="airTooltipItem" class="bg-white text-slate-800 text-xs rounded-2xl p-4 shadow-2xl border border-slate-200 text-left">
+            <div v-if="airTooltipVisible && airTooltipItem && airTooltipItem.urgentAirRisk" class="bg-white text-slate-800 text-xs rounded-2xl p-4 shadow-2xl border border-slate-200 text-left">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
                     <span class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                         <span class="text-base">✈️</span> 紧急转空运成本测算
@@ -829,7 +829,7 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                     </div>
                                 </td>
                                 <td class="p-2 text-center align-middle border-b border-slate-100 w-24 whitespace-nowrap">
-                                    <select v-model="item.logistics" class="editable-input text-xs cursor-pointer hover:border-blue-400 py-1 px-1 w-20 mx-auto block" :class="{'danger-select': item.hasWeightError}">
+                                    <select v-model="item.logistics" @change="hideAirTooltip(true)" class="editable-input text-xs cursor-pointer hover:border-blue-400 py-1 px-1 w-20 mx-auto block" :class="{'danger-select': item.hasWeightError}">
                                         <option value="空运">✈️ 空运</option>
                                         <option value="海运">🚢 海运</option>
                                         <option value="空海结合">✈️🚢 空海结合</option>
@@ -841,9 +841,9 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                                     
                                     <!-- 海运断货风险提醒与改空运紧凑按钮 (移至顶层 fixed 卡片展示，杜绝遮挡) -->
                                     <div v-if="item.urgentAirRisk" class="mt-1 flex justify-center">
-                                        <button @click="item.logistics = '空运'" 
+                                        <button @click="switchToAirAndHideTooltip(item)" 
                                                 @mouseenter="showAirTooltip($event, item)" 
-                                                @mouseleave="hideAirTooltip"
+                                                @mouseleave="hideAirTooltip(false)"
                                                 class="text-[10px] bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-bold px-2 py-0.5 rounded shadow-sm inline-flex items-center gap-1 transition-all hover:scale-105 active:scale-95 animate-pulse hover:animate-none cursor-pointer whitespace-nowrap" 
                                                 title="点击一键切换为空运">
                                             <span>⚡ 改空运</span>
@@ -1632,13 +1632,19 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                 const airTooltipVisible = ref(false);
                 const airTooltipPos = ref({ top: '0px', left: '0px' });
                 let hideAirTooltipTimeout = null;
+                let airTooltipTriggerEl = null;
 
                 const showAirTooltip = (e, item) => {
-                    if (!item) return;
+                    if (!item || !item.urgentAirRisk) {
+                        hideAirTooltip(true);
+                        return;
+                    }
                     clearTimeout(hideAirTooltipTimeout);
+                    hideAirTooltipTimeout = null;
                     airTooltipItem.value = item;
                     
                     const target = e.currentTarget || e.target;
+                    airTooltipTriggerEl = target;
                     const rect = target.getBoundingClientRect();
                     const tooltipWidth = 310;
                     
@@ -1671,12 +1677,39 @@ function _i(e,t){const n=ns(e);class s extends xi{constructor(e){super(n,e,t)}}r
                     airTooltipVisible.value = true;
                 };
 
-                const hideAirTooltip = () => {
+                const hideAirTooltip = (immediate = false) => {
+                    clearTimeout(hideAirTooltipTimeout);
+                    hideAirTooltipTimeout = null;
                     airTooltipVisible.value = false;
-                    hideAirTooltipTimeout = setTimeout(() => {
+                    airTooltipTriggerEl = null;
+                    if (immediate) {
                         airTooltipItem.value = null;
-                    }, 150);
+                    } else {
+                        hideAirTooltipTimeout = setTimeout(() => {
+                            if (!airTooltipVisible.value) {
+                                airTooltipItem.value = null;
+                            }
+                        }, 150);
+                    }
                 };
+
+                // 点击「⚡ 改空运」按钮时同步切换物流并立即销毁悬浮提示卡片，防止 DOM 移除漏触发 mouseleave 导致残留
+                const switchToAirAndHideTooltip = (item) => {
+                    if (item) {
+                        item.logistics = '空运';
+                    }
+                    hideAirTooltip(true);
+                };
+
+                // 响应式熔断监听：一旦当前悬浮商品不再处于海运断货风险状态（切空运/改库存/批量变更等），立即清除提示卡片
+                watch(
+                    () => airTooltipItem.value ? `${airTooltipItem.value.id}_${airTooltipItem.value.logistics}_${airTooltipItem.value.urgentAirRisk}` : '',
+                    () => {
+                        if (airTooltipVisible.value && (!airTooltipItem.value || !airTooltipItem.value.urgentAirRisk)) {
+                            hideAirTooltip(true);
+                        }
+                    }
+                );
 
                 // 全局单例高清趋势卡片状态 (零卡顿 120 FPS 渲染架构 + Hover Intent 停留延迟防误触)
                 const trendTooltipItem = ref(null);
@@ -2353,6 +2386,31 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                         setTimeout(() => {
                             checkVersionUpdate(false);
                         }, 1200);
+
+                        // 全局悬浮标签防残留保护：滚动、窗口失焦、或鼠标离开/触发按钮被DOM移除时立即清除
+                        const clearAllFloatingTooltips = () => {
+                            if (airTooltipVisible.value || airTooltipItem.value) hideAirTooltip(true);
+                            if (trendTooltipVisible.value || trendTooltipItem.value) hideTrendPreview();
+                            if (previewVisible.value || previewImage.value) hidePreview();
+                        };
+                        window.addEventListener('scroll', clearAllFloatingTooltips, true);
+                        window.addEventListener('blur', clearAllFloatingTooltips);
+                        document.addEventListener('mousemove', (ev) => {
+                            if (!airTooltipVisible.value) return;
+                            if (!airTooltipTriggerEl || !document.contains(airTooltipTriggerEl)) {
+                                hideAirTooltip(true);
+                                return;
+                            }
+                            const r = airTooltipTriggerEl.getBoundingClientRect();
+                            if (r.width === 0 && r.height === 0) {
+                                hideAirTooltip(true);
+                                return;
+                            }
+                            const pad = 4;
+                            if (ev.clientX < r.left - pad || ev.clientX > r.right + pad || ev.clientY < r.top - pad || ev.clientY > r.bottom + pad) {
+                                hideAirTooltip(true);
+                            }
+                        }, { passive: true });
                         
                     } catch (e) {
                         console.error('onMounted 初始化未知异常:', e);
@@ -2398,11 +2456,23 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
                 watch([filterCountry, filterLogistics, filterItemType, filterStatus, filterNewProduct,
                     filterLoss, sortField, sortOrder, hideSafe, searchQuery, searchType], () => {
                     currentPage.value = 1;
+                    hideAirTooltip(true);
+                    hideTrendPreview();
+                    hidePreview();
+                });
+
+                watch(currentPage, () => {
+                    hideAirTooltip(true);
+                    hideTrendPreview();
+                    hidePreview();
                 });
 
 // --- 替换这两个清空函数 ---
                 const resetSalesData = () => {
                     if (confirm("确定要清空当前的销量数据吗？\n（马帮 SKU 基础库不会被清空）")) {
+                        hideAirTooltip(true);
+                        hideTrendPreview();
+                        hidePreview();
                         processedData.value = [];
                         sortField.value = 'default';
                         localforage.removeItem('replenish_processedData');
@@ -2411,6 +2481,9 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
 
                 const clearSkuBaseData = () => {
                     if (confirm("🚨 警告：您确定要清空底层 SKU 数据库吗？\n清空后需要重新上传马帮 SKU 表！")) {
+                        hideAirTooltip(true);
+                        hideTrendPreview();
+                        hidePreview();
                         skuBaseMap.value = {};
                         localforage.removeItem('replenish_skuBaseMap');
                         processedData.value = []; 
@@ -2422,6 +2495,9 @@ console.log("=== LOGIN RES DATA ===", JSON.stringify(data));
 
                 const removeRow = (itemToRemove) => {
                     if(confirm(`确定要移除 SKU: ${itemToRemove.sku} 吗？\n移除后将不再参与计算和导出。`)) {
+                        hideAirTooltip(true);
+                        hideTrendPreview();
+                        hidePreview();
                         processedData.value = processedData.value.filter(item => item.id !== itemToRemove.id);
                     }
                 };
@@ -3635,6 +3711,7 @@ const processInTransitData = (data) => {
 
                 const applyBatchLogistics = () => {
                     if (!batchLogistics.value) return;
+                    hideAirTooltip(true);
                     filteredAndSortedData.value.filter(item => item.selected).forEach(item => {
                         item.logistics = batchLogistics.value;
                         item.weightError = false;
@@ -3895,7 +3972,7 @@ const exportExcel = () => {
                     isDragOver, hasSkuData,
                     isConfigCollapsed,
                     previewImage, previewVisible, previewPos, showPreview, hidePreview,
-                    airTooltipItem, airTooltipVisible, airTooltipPos, showAirTooltip, hideAirTooltip,
+                    airTooltipItem, airTooltipVisible, airTooltipPos, showAirTooltip, hideAirTooltip, switchToAirAndHideTooltip,
                     trendTooltipItem, trendTooltipVisible, trendTooltipPos, trendHoverPoint, showTrendPreview, hideTrendPreview, cancelHideTrendPreview, handleCellMouseMove, handleSparklineMouseMove,
                     filterCountry, filterLogistics, filterItemType, getStatusClass,
                     searchType, searchQuery, // 搜索状态暴露
